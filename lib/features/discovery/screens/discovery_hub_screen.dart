@@ -1,37 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:tripgenie/core/constants/app_colors.dart';
 import 'package:tripgenie/core/constants/app_strings.dart';
+import 'package:tripgenie/core/services/api_service.dart';
 
-class DiscoveryHubScreen extends StatelessWidget {
+class DiscoveryHubScreen extends StatefulWidget {
   const DiscoveryHubScreen({super.key});
 
-  // Mock data — Phase 2 will replace with real OpenTripMap API data
-  static const List<Map<String, dynamic>> _trendingPlaces = [
-    {
-      'name': 'Neo Coffee House',
-      'category': 'Café & Bistro',
-      'crowd': 'Bustling',
-      'crowdLevel': 0.8,
-      'rating': 4.8,
-      'color': 0xFF6366F1,
-    },
-    {
-      'name': 'Skyline Gardens',
-      'category': 'Park',
-      'crowd': 'Moderate',
-      'crowdLevel': 0.5,
-      'rating': 4.6,
-      'color': 0xFF10B981,
-    },
-    {
-      'name': 'The Grand Terrace',
-      'category': 'Restaurant',
-      'crowd': 'Quiet',
-      'crowdLevel': 0.2,
-      'rating': 4.9,
-      'color': 0xFFF59E0B,
-    },
-  ];
+  @override
+  State<DiscoveryHubScreen> createState() => _DiscoveryHubScreenState();
+}
+
+class _DiscoveryHubScreenState extends State<DiscoveryHubScreen> {
+  List<dynamic> _trendingPlaces = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchPlaces();
+  }
+
+  Future<void> _fetchPlaces() async {
+    final places = await ApiService.getPlaces();
+    setState(() {
+      _trendingPlaces = places;
+      _isLoading = false;
+    });
+  }
 
   static const List<Map<String, dynamic>> _topVisited = [
     {'name': 'Grand Park Plaza', 'visits': '12.4k'},
@@ -103,7 +98,6 @@ class DiscoveryHubScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Greeting
                   const Text(
                     'Good morning 👋',
                     style: TextStyle(
@@ -122,10 +116,7 @@ class DiscoveryHubScreen extends StatelessWidget {
                       letterSpacing: -0.5,
                     ),
                   ),
-
                   const SizedBox(height: 20),
-
-                  // Search bar
                   Container(
                     height: 48,
                     decoration: BoxDecoration(
@@ -148,10 +139,7 @@ class DiscoveryHubScreen extends StatelessWidget {
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 28),
-
-                  // Category filters
                   _SectionHeader(
                     title: AppStrings.trendingNow,
                     onSeeAll: () {},
@@ -161,24 +149,28 @@ class DiscoveryHubScreen extends StatelessWidget {
             ),
           ),
 
-          // Trending cards horizontal scroll
+          // Trending cards horizontal scroll (NOW POWERED BY FASTAPI)
           SliverToBoxAdapter(
             child: SizedBox(
-              height: 200,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-                itemCount: _trendingPlaces.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 14),
-                itemBuilder: (context, i) {
-                  final place = _trendingPlaces[i];
-                  return _TrendingCard(place: place);
-                },
-              ),
+              height: 220,
+              child: _isLoading 
+                ? const Center(child: CircularProgressIndicator())
+                : _trendingPlaces.isEmpty 
+                  ? const Center(child: Text("No places found. Check backend connection."))
+                  : ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                      itemCount: _trendingPlaces.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 14),
+                      itemBuilder: (context, i) {
+                        final place = _trendingPlaces[i];
+                        return _TrendingCard(place: place);
+                      },
+                    ),
             ),
           ),
 
-          // Top visited
+          // Top visited (Still static for now to save time)
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
@@ -250,7 +242,10 @@ class _TrendingCard extends StatelessWidget {
   const _TrendingCard({required this.place});
 
   Color get _crowdColor {
-    final level = place['crowdLevel'] as double;
+    // NULL-SAFE CHECK: Default to 0.5 if backend forgets to send it
+    final rawLevel = place['crowdLevel'];
+    final level = rawLevel != null ? (rawLevel as num).toDouble() : 0.5;
+    
     if (level > 0.6) return AppColors.crowdHigh;
     if (level > 0.3) return AppColors.crowdMedium;
     return AppColors.crowdLow;
@@ -258,6 +253,20 @@ class _TrendingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Safely handle colors from backend
+    int colorValue = AppColors.primary.value; // Default
+    if (place['color'] != null) {
+      if (place['color'] is int) {
+        colorValue = place['color'];
+      } else if (place['color'] is String) {
+        colorValue = int.tryParse(place['color'].toString()) ?? colorValue;
+      }
+    }
+
+    // NULL-SAFE CHECK for the text label
+    final rawLevel = place['crowdLevel'];
+    final crowdLevel = rawLevel != null ? (rawLevel as num).toDouble() : 0.5;
+
     return Container(
       width: 180,
       decoration: BoxDecoration(
@@ -268,17 +277,16 @@ class _TrendingCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Image placeholder
           Container(
             height: 100,
             decoration: BoxDecoration(
-              color: Color(place['color'] as int).withOpacity(0.15),
+              color: Color(colorValue).withOpacity(0.15),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
             ),
             child: Center(
               child: Icon(
                 Icons.place_rounded,
-                color: Color(place['color'] as int),
+                color: Color(colorValue),
                 size: 36,
               ),
             ),
@@ -289,7 +297,7 @@ class _TrendingCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  place['name'] as String,
+                  place['name'] as String? ?? 'Unknown',
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -300,7 +308,7 @@ class _TrendingCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  place['category'] as String,
+                  place['category'] as String? ?? 'Category',
                   style: const TextStyle(
                     fontSize: 11,
                     color: AppColors.textSecondary,
@@ -310,8 +318,7 @@ class _TrendingCard extends StatelessWidget {
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: _crowdColor.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(20),
@@ -328,7 +335,7 @@ class _TrendingCard extends StatelessWidget {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            place['crowd'] as String,
+                            crowdLevel > 0.6 ? 'Bustling' : 'Quiet',
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
@@ -339,11 +346,10 @@ class _TrendingCard extends StatelessWidget {
                       ),
                     ),
                     const Spacer(),
-                    const Icon(Icons.star_rounded,
-                        color: Color(0xFFFBBF24), size: 13),
+                    const Icon(Icons.star_rounded, color: Color(0xFFFBBF24), size: 13),
                     const SizedBox(width: 2),
                     Text(
-                      '${place['rating']}',
+                      '${place['rating'] ?? 4.0}',
                       style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
