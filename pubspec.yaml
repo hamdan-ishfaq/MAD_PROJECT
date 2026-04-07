@@ -1,0 +1,54 @@
+name: tripgenie
+description: AI-powered travel planner and group match app
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management
+  provider: ^6.1.1
+
+  # Navigation
+  go_router: ^13.0.0
+
+  # HTTP & API
+  http: ^1.2.0
+  dio: ^5.4.0
+
+  # Local storage
+  shared_preferences: ^2.2.2
+
+  # Maps (FREE - OpenStreetMap)
+  flutter_map: ^6.1.0
+  latlong2: ^0.9.0
+
+  # UI
+  google_fonts: ^6.2.1
+  cached_network_image: ^3.3.1
+  shimmer: ^3.0.0
+  lottie: ^3.1.0
+
+  # Icons
+  cupertino_icons: ^1.0.6
+  flutter_svg: ^2.0.9
+
+  # Utils
+  intl: ^0.19.0
+  url_launcher: ^6.2.4
+  permission_handler: ^11.3.0
+  geolocator: ^11.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
