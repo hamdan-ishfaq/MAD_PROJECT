@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:tripgenie/core/constants/app_colors.dart';
-import 'package:tripgenie/core/constants/app_strings.dart';
-import 'package:tripgenie/core/routes/app_routes.dart';
+import 'package:Wanderland/core/constants/app_colors.dart';
+import 'package:Wanderland/core/constants/app_strings.dart';
+import 'package:Wanderland/core/routes/app_routes.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -101,7 +101,7 @@ class _SplashScreenState extends State<SplashScreen>
                       ),
                       child: const Center(
                         child: Text(
-                          'TG',
+                          'WL',
                           style: TextStyle(
                             fontSize: 36,
                             fontWeight: FontWeight.w800,

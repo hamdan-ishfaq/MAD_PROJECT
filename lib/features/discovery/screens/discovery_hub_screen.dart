@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:tripgenie/core/constants/app_colors.dart';
-import 'package:tripgenie/core/constants/app_strings.dart';
-import 'package:tripgenie/core/services/api_service.dart';
+import 'package:Wanderland/core/constants/app_colors.dart';
+import 'package:Wanderland/core/constants/app_strings.dart';
+import 'package:Wanderland/core/services/api_service.dart';
 
 class DiscoveryHubScreen extends StatefulWidget {
   const DiscoveryHubScreen({super.key});
@@ -149,7 +149,7 @@ class _DiscoveryHubScreenState extends State<DiscoveryHubScreen> {
             ),
           ),
 
-          // Trending cards horizontal scroll (NOW POWERED BY FASTAPI)
+          // Trending cards horizontal scroll
           SliverToBoxAdapter(
             child: SizedBox(
               height: 220,
@@ -170,7 +170,7 @@ class _DiscoveryHubScreenState extends State<DiscoveryHubScreen> {
             ),
           ),
 
-          // Top visited (Still static for now to save time)
+          // Top visited
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),

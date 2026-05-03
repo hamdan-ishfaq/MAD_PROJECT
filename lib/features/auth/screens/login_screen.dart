@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:tripgenie/core/constants/app_colors.dart';
-import 'package:tripgenie/core/constants/app_strings.dart';
-import 'package:tripgenie/core/routes/app_routes.dart';
+import 'package:Wanderland/core/constants/app_colors.dart';
+import 'package:Wanderland/core/constants/app_strings.dart';
+import 'package:Wanderland/core/routes/app_routes.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -29,7 +29,6 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
 
-    // Simulate auth - in Phase 3 this will hit a real backend
     await Future.delayed(const Duration(milliseconds: 1200));
 
     if (mounted) {
@@ -77,7 +76,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   child: const Center(
                     child: Text(
-                      'TG',
+                      'WL',
                       style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.w800,

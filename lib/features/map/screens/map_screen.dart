@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:tripgenie/core/constants/app_colors.dart';
-import 'package:tripgenie/core/constants/app_strings.dart';
-import 'package:tripgenie/core/services/api_service.dart'; // Added API Service
+import 'package:Wanderland/core/constants/app_colors.dart';
+import 'package:Wanderland/core/constants/app_strings.dart';
+import 'package:Wanderland/core/services/api_service.dart'; // Added API Service
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -21,7 +21,7 @@ class _MapScreenState extends State<MapScreen> {
   bool _isLoadingPlaces = true;
   String _selectedCategory = 'All';
 
-  // Empty list that will be filled by the Backend!
+  // Empty list that will be filled by the Backend
   List<Map<String, dynamic>> _allPlaces = [];
 
   List<Map<String, dynamic>> get _filteredPlaces {
@@ -46,7 +46,7 @@ class _MapScreenState extends State<MapScreen> {
           'lat': p['lat'] ?? 33.6844,
           'lng': p['lng'] ?? 73.0479,
           'color': p['color'] ?? 0xFF6366F1,
-          'type': p['category'], // Link backend 'category' to our map 'type'
+          'type': p['category'],
           'rating': p['rating'] ?? 4.0,
         }).toList();
         _isLoadingPlaces = false;
@@ -174,7 +174,7 @@ class _MapScreenState extends State<MapScreen> {
             children: [
               TileLayer(
                 urlTemplate: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
-                userAgentPackageName: 'com.example.tripgenie',
+                userAgentPackageName: 'com.example.Wanderland',
               ),
               MarkerLayer(
                 markers: _filteredPlaces.map((place) => Marker(

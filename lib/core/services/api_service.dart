@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-static const String baseUrl = 'http://10.131.209.150:8080';
+static const String baseUrl = '2404:3100:1825:a72e:dd6a:ac1b:d1cb:937b';
   static Future<List<dynamic>> getPlaces() async {
     try {
       final response = await http.get(Uri.parse('$baseUrl/places'));
@@ -13,7 +13,7 @@ static const String baseUrl = 'http://10.131.209.150:8080';
       }
     } catch (e) {
       print('API Error: $e');
-      return []; // Return empty list if backend is down so app doesn't crash
+      return [];
     }
   }
 }

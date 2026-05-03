@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:tripgenie/core/constants/app_colors.dart';
-import 'package:tripgenie/core/constants/app_strings.dart';
-import 'package:tripgenie/core/routes/app_routes.dart';
+import 'package:Wanderland/core/constants/app_colors.dart';
+import 'package:Wanderland/core/constants/app_strings.dart';
+import 'package:Wanderland/core/routes/app_routes.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});

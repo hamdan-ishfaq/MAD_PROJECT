@@ -1,7 +1,7 @@
 class AppStrings {
   AppStrings._();
 
-  static const String appName = 'TripGenie';
+  static const String appName = 'Wanderland';
   static const String tagline = 'Discover Places by Vibe & Crowd Intelligence';
 
   // Auth
