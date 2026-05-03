@@ -1,4 +1,4 @@
-# tripgenie
+# Wanderland
 
 A new Flutter project.
 
