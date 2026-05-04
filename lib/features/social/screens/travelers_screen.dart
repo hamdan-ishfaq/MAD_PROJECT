@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:Wanderland/core/constants/app_colors.dart';
-import 'package:Wanderland/features/social/models/trip_model.dart';
-import 'package:Wanderland/features/social/screens/chat_screen.dart';
-import 'package:Wanderland/features/social/screens/post_trip_screen.dart';
+import 'package:tripgenie/core/constants/app_colors.dart';
+import 'package:tripgenie/features/social/models/trip_model.dart';
+import 'package:tripgenie/features/social/screens/chat_screen.dart';
+import 'package:tripgenie/features/social/screens/post_trip_screen.dart';
+import 'package:tripgenie/core/services/api_service.dart';
 
 // TravelersScreen  -  Phase 7
 //  Shows posted trips and lets users filter by destination.
@@ -22,8 +23,28 @@ class _TravelersScreenState extends State<TravelersScreen> {
   @override
   void initState() {
     super.initState();
-    _allTrips = TripRepository.getSampleTrips();
-    _filtered = _allTrips;
+    _loadPlacesAsTrips();
+  }
+
+  Future<void> _loadPlacesAsTrips() async {
+    final places = await ApiService.getPlaces();
+    if (!mounted) return;
+    setState(() {
+      _allTrips = places.map<TripPost>((p) => TripPost(
+        id: p['id']?.toString() ?? 'unknown',
+        destination: p['name'] ?? 'Unknown Place',
+        startDate: 'Ongoing',
+        endDate: 'Community',
+        groupSize: 100,
+        currentMembers: ((p['rating'] ?? 4.0) * 10).toInt(),
+        interests: [p['category'] ?? 'General'],
+        description: 'Join the community chat for ${p['name']}! Share your experiences, ask questions, and meet fellow travelers.',
+        userName: 'WanderLand Community',
+        userInitials: 'WC',
+        postedAgo: 'Always Active',
+      )).toList();
+      _filtered = _allTrips;
+    });
   }
 
   void _search(String query) {
@@ -32,12 +53,8 @@ class _TravelersScreenState extends State<TravelersScreen> {
           ? _allTrips
           : _allTrips
               .where((t) =>
-                  t.destination
-                      .toLowerCase()
-                      .contains(query.toLowerCase()) ||
-                  t.userName
-                      .toLowerCase()
-                      .contains(query.toLowerCase()))
+                  t.destination.toLowerCase().contains(query.toLowerCase()) ||
+                  t.userName.toLowerCase().contains(query.toLowerCase()))
               .toList();
     });
   }
@@ -56,8 +73,7 @@ class _TravelersScreenState extends State<TravelersScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         title: const Text('Travel Buddies',
-            style:
-                TextStyle(fontWeight: FontWeight.w700, fontSize: 20)),
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20)),
         actions: [
           // Post a trip button
           Padding(
@@ -65,8 +81,7 @@ class _TravelersScreenState extends State<TravelersScreen> {
             child: TextButton.icon(
               onPressed: () async {
                 final newTrip = await Navigator.of(context).push<TripPost>(
-                  MaterialPageRoute(
-                      builder: (_) => const PostTripScreen()),
+                  MaterialPageRoute(builder: (_) => const PostTripScreen()),
                 );
                 if (newTrip != null) {
                   setState(() {
@@ -79,8 +94,7 @@ class _TravelersScreenState extends State<TravelersScreen> {
                   color: AppColors.primary, size: 18),
               label: const Text('Post Trip',
                   style: TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w600)),
+                      color: AppColors.primary, fontWeight: FontWeight.w600)),
             ),
           ),
         ],
@@ -90,15 +104,14 @@ class _TravelersScreenState extends State<TravelersScreen> {
           // Search bar
           Container(
             color: Colors.white,
-            padding:
-                const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: TextField(
               controller: _searchController,
               onChanged: _search,
               decoration: InputDecoration(
                 hintText: 'Search by destination or traveler…',
-                prefixIcon: const Icon(Icons.search_rounded,
-                    color: AppColors.textHint),
+                prefixIcon:
+                    const Icon(Icons.search_rounded, color: AppColors.textHint),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
                         icon: const Icon(Icons.clear_rounded,
@@ -114,8 +127,7 @@ class _TravelersScreenState extends State<TravelersScreen> {
                 border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none),
-                contentPadding:
-                    const EdgeInsets.symmetric(vertical: 12),
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
               ),
             ),
           ),
@@ -132,23 +144,20 @@ class _TravelersScreenState extends State<TravelersScreen> {
                         const SizedBox(height: 12),
                         Text('No trips found',
                             style: TextStyle(
-                                color: Colors.grey.shade400,
-                                fontSize: 15)),
+                                color: Colors.grey.shade400, fontSize: 15)),
                       ],
                     ),
                   )
                 : ListView.separated(
                     padding: const EdgeInsets.all(16),
                     itemCount: _filtered.length,
-                    separatorBuilder: (_, __) =>
-                        const SizedBox(height: 12),
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
                     itemBuilder: (context, i) => _TripCard(
                       trip: _filtered[i],
                       onJoin: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (_) =>
-                                ChatScreen(trip: _filtered[i]),
+                            builder: (_) => ChatScreen(trip: _filtered[i]),
                           ),
                         );
                       },
@@ -207,19 +216,17 @@ class _TripCard extends StatelessWidget {
                     children: [
                       Text(trip.userName,
                           style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14)),
+                              fontWeight: FontWeight.w600, fontSize: 14)),
                       Text(trip.postedAgo,
                           style: const TextStyle(
-                              color: AppColors.textHint,
-                              fontSize: 11)),
+                              color: AppColors.textHint, fontSize: 11)),
                     ],
                   ),
                 ),
                 // Spots badge
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: trip.isFull
                         ? Colors.grey.shade100
@@ -244,8 +251,7 @@ class _TripCard extends StatelessWidget {
 
           // Destination + dates
           Padding(
-            padding:
-                const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: Row(
               children: [
                 const Icon(Icons.flight_takeoff_rounded,
@@ -262,34 +268,28 @@ class _TripCard extends StatelessWidget {
                 const SizedBox(width: 4),
                 Text('${trip.startDate} – ${trip.endDate}',
                     style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary)),
+                        fontSize: 12, color: AppColors.textSecondary)),
               ],
             ),
           ),
 
           // Description
           Padding(
-            padding:
-                const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: Text(trip.description,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
-                    height: 1.4)),
+                    fontSize: 13, color: AppColors.textSecondary, height: 1.4)),
           ),
 
           // Interests chips
           Padding(
-            padding:
-                const EdgeInsets.fromLTRB(16, 10, 16, 0),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
             child: Wrap(
               spacing: 6,
-              children: trip.interests
-                  .map((i) => _InterestPill(label: i))
-                  .toList(),
+              children:
+                  trip.interests.map((i) => _InterestPill(label: i)).toList(),
             ),
           ),
 
@@ -297,8 +297,7 @@ class _TripCard extends StatelessWidget {
           const SizedBox(height: 12),
           const Divider(height: 1, color: AppColors.border),
           Padding(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 16, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             child: Row(
               children: [
                 // Member avatars (stacked)
@@ -333,28 +332,27 @@ class _TripCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Text('${trip.currentMembers} joined',
                     style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary)),
+                        fontSize: 12, color: AppColors.textSecondary)),
                 const Spacer(),
                 // Join / Chat button
-                ElevatedButton.icon(
-                  onPressed: trip.isFull ? null : onJoin,
-                  icon: const Icon(
-                      Icons.chat_bubble_outline_rounded,
-                      size: 16),
-                  label: const Text('Join & Chat'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 8),
-                    textStyle: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600),
-                    shape: RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(10)),
-                    elevation: 0,
+                SizedBox(
+                  width: 130,
+                  child: ElevatedButton.icon(
+                    onPressed: trip.isFull ? null : onJoin,
+                    icon:
+                        const Icon(Icons.chat_bubble_outline_rounded, size: 16),
+                    label: const Text('Join & Chat'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 8),
+                      textStyle: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w600),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
+                    ),
                   ),
                 ),
               ],
@@ -372,8 +370,7 @@ class _InterestPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: AppColors.background,
         borderRadius: BorderRadius.circular(20),

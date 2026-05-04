@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:Wanderland/core/constants/app_colors.dart';
-import 'package:Wanderland/core/constants/app_strings.dart';
-import 'package:Wanderland/core/routes/app_routes.dart';
+import 'package:tripgenie/core/constants/app_colors.dart';
+import 'package:tripgenie/core/constants/app_strings.dart';
+import 'package:tripgenie/core/routes/app_routes.dart';
+import 'package:tripgenie/core/services/auth_api_service.dart';
+import 'package:tripgenie/features/auth/screens/signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -29,11 +31,30 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
 
-    await Future.delayed(const Duration(milliseconds: 1200));
+    // Call backend API for authentication
+    final user = await AuthApiService.login(
+      _emailController.text.trim(),
+      _passwordController.text,
+    );
 
     if (mounted) {
       setState(() => _isLoading = false);
-      context.go(AppRoutes.home);
+
+      if (user != null) {
+        // Login successful
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Welcome, ${user.name}!')),
+        );
+        context.go(AppRoutes.home);
+      } else {
+        // Login failed
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Login failed. Check your credentials.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -168,7 +189,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     child: const Text(
                       AppStrings.forgotPassword,
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                      style:
+                          TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
                     ),
                   ),
                 ),
@@ -201,7 +223,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   width: double.infinity,
                   height: 52,
                   child: OutlinedButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const SignUpScreen(),
+                        ),
+                      );
+                    },
                     child: const Text(AppStrings.signUp),
                   ),
                 ),

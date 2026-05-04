@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:Wanderland/core/constants/app_colors.dart';
-import 'package:Wanderland/core/constants/app_strings.dart';
-import 'package:Wanderland/core/routes/app_routes.dart';
+import 'package:tripgenie/core/constants/app_colors.dart';
+import 'package:tripgenie/core/constants/app_strings.dart';
+import 'package:tripgenie/core/routes/app_routes.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -206,8 +206,8 @@ class _LoadingDotsState extends State<_LoadingDots>
             width: 8,
             height: 8,
             decoration: BoxDecoration(
-              color: Colors.white
-                  .withOpacity(0.4 + (_controllers[i].value * 0.6)),
+              color:
+                  Colors.white.withOpacity(0.4 + (_controllers[i].value * 0.6)),
               shape: BoxShape.circle,
             ),
           ),

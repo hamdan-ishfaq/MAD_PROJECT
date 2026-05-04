@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:Wanderland/core/constants/app_colors.dart';
-import 'package:Wanderland/core/services/itinerary_service.dart';
-import 'package:Wanderland/features/planner/screens/itinerary_result_screen.dart';
+import 'package:tripgenie/core/constants/app_colors.dart';
+import 'package:tripgenie/core/services/itinerary_service.dart';
+import 'package:tripgenie/features/planner/screens/itinerary_result_screen.dart';
 
 class PlannerScreen extends StatefulWidget {
   const PlannerScreen({super.key});
@@ -17,11 +17,11 @@ class _PlannerScreenState extends State<PlannerScreen> {
   bool _isLoading = false;
 
   final List<Map<String, dynamic>> _allInterests = [
-    {'label': 'Food',      'icon': Icons.restaurant_outlined},
-    {'label': 'History',   'icon': Icons.museum_outlined},
-    {'label': 'Nature',    'icon': Icons.park_outlined},
-    {'label': 'Shopping',  'icon': Icons.shopping_bag_outlined},
-    {'label': 'Art',       'icon': Icons.palette_outlined},
+    {'label': 'Food', 'icon': Icons.restaurant_outlined},
+    {'label': 'History', 'icon': Icons.museum_outlined},
+    {'label': 'Nature', 'icon': Icons.park_outlined},
+    {'label': 'Shopping', 'icon': Icons.shopping_bag_outlined},
+    {'label': 'Art', 'icon': Icons.palette_outlined},
     {'label': 'Adventure', 'icon': Icons.hiking_outlined},
   ];
   final List<String> _selectedInterests = [];
@@ -42,12 +42,14 @@ class _PlannerScreenState extends State<PlannerScreen> {
 
     setState(() => _isLoading = true);
 
+    // Debug: verify API key is loaded
+    debugPrint('[Planner] Generating itinerary for ${_destinationController.text.trim()}');
+
     final itinerary = await ItineraryService.generateItinerary(
       destination: _destinationController.text.trim(),
       days: _days,
       budget: _budget,
-      interests:
-      _selectedInterests.isEmpty ? ['General'] : _selectedInterests,
+      interests: _selectedInterests.isEmpty ? ['General'] : _selectedInterests,
     );
 
     setState(() => _isLoading = false);
@@ -62,8 +64,9 @@ class _PlannerScreenState extends State<PlannerScreen> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Could not generate. Check your Grok API key.'),
+          content: Text('Could not generate itinerary. Make sure the backend is running and your Groq API key is valid.'),
           backgroundColor: Colors.redAccent,
+          duration: Duration(seconds: 4),
         ),
       );
     }
@@ -109,7 +112,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                                 fontSize: 16)),
                         Text('Day-by-day plans with weather forecasts',
                             style:
-                            TextStyle(color: Colors.white70, fontSize: 12)),
+                                TextStyle(color: Colors.white70, fontSize: 12)),
                       ],
                     ),
                   ),
@@ -121,8 +124,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
 
             // Destination
             const Text('Where do you want to go?',
-                style:
-                TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
             const SizedBox(height: 8),
             TextField(
               controller: _destinationController,
@@ -132,16 +134,14 @@ class _PlannerScreenState extends State<PlannerScreen> {
                     color: AppColors.primary),
                 border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide:
-                    BorderSide(color: Colors.grey.shade300)),
+                    borderSide: BorderSide(color: Colors.grey.shade300)),
                 enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide:
-                    BorderSide(color: Colors.grey.shade300)),
+                    borderSide: BorderSide(color: Colors.grey.shade300)),
                 focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(
-                        color: AppColors.primary, width: 2)),
+                    borderSide:
+                        const BorderSide(color: AppColors.primary, width: 2)),
                 filled: true,
                 fillColor: Colors.white,
               ),
@@ -154,8 +154,8 @@ class _PlannerScreenState extends State<PlannerScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text('Number of Days',
-                    style: TextStyle(
-                        fontWeight: FontWeight.w600, fontSize: 15)),
+                    style:
+                        TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
                 _Pill(label: '$_days days'),
               ],
             ),
@@ -171,11 +171,11 @@ class _PlannerScreenState extends State<PlannerScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('1 day',
-                    style: TextStyle(
-                        fontSize: 11, color: Colors.grey.shade500)),
+                    style:
+                        TextStyle(fontSize: 11, color: Colors.grey.shade500)),
                 Text('14 days',
-                    style: TextStyle(
-                        fontSize: 11, color: Colors.grey.shade500)),
+                    style:
+                        TextStyle(fontSize: 11, color: Colors.grey.shade500)),
               ],
             ),
 
@@ -186,8 +186,8 @@ class _PlannerScreenState extends State<PlannerScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text('Total Budget',
-                    style: TextStyle(
-                        fontWeight: FontWeight.w600, fontSize: 15)),
+                    style:
+                        TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
                 _Pill(label: '\$${_budget.round()}'),
               ],
             ),
@@ -203,11 +203,11 @@ class _PlannerScreenState extends State<PlannerScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('\$100',
-                    style: TextStyle(
-                        fontSize: 11, color: Colors.grey.shade500)),
+                    style:
+                        TextStyle(fontSize: 11, color: Colors.grey.shade500)),
                 Text('\$5000',
-                    style: TextStyle(
-                        fontSize: 11, color: Colors.grey.shade500)),
+                    style:
+                        TextStyle(fontSize: 11, color: Colors.grey.shade500)),
               ],
             ),
 
@@ -215,19 +215,17 @@ class _PlannerScreenState extends State<PlannerScreen> {
 
             // Interests
             const Text('Your Interests',
-                style:
-                TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
             const SizedBox(height: 4),
             Text('Select all that apply',
-                style: TextStyle(
-                    fontSize: 12, color: Colors.grey.shade500)),
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: _allInterests.map((item) {
                 final label = item['label'] as String;
-                final icon  = item['icon']  as IconData;
+                final icon = item['icon'] as IconData;
                 final selected = _selectedInterests.contains(label);
                 return GestureDetector(
                   onTap: () {
@@ -239,12 +237,10 @@ class _PlannerScreenState extends State<PlannerScreen> {
                   },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
-                      color: selected
-                          ? AppColors.primary
-                          : Colors.white,
+                      color: selected ? AppColors.primary : Colors.white,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                           color: selected
@@ -256,9 +252,8 @@ class _PlannerScreenState extends State<PlannerScreen> {
                       children: [
                         Icon(icon,
                             size: 15,
-                            color: selected
-                                ? Colors.white
-                                : Colors.grey.shade600),
+                            color:
+                                selected ? Colors.white : Colors.grey.shade600),
                         const SizedBox(width: 6),
                         Text(label,
                             style: TextStyle(
@@ -293,41 +288,37 @@ class _PlannerScreenState extends State<PlannerScreen> {
                 ),
                 child: _isLoading
                     ? const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          color: Colors.white),
-                    ),
-                    SizedBox(width: 12),
-                    Text('Grok is planning your trip…',
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600)),
-                  ],
-                )
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2.5, color: Colors.white),
+                          ),
+                          SizedBox(width: 12),
+                          Text('Grok is planning your trip…',
+                              style: TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.w600)),
+                        ],
+                      )
                     : const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.auto_awesome_rounded, size: 20),
-                    SizedBox(width: 8),
-                    Text('Generate My Itinerary',
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600)),
-                  ],
-                ),
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.auto_awesome_rounded, size: 20),
+                          SizedBox(width: 8),
+                          Text('Generate My Itinerary',
+                              style: TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.w600)),
+                        ],
+                      ),
               ),
             ),
 
             const SizedBox(height: 14),
             Center(
               child: Text('Powered by Grok · xAI',
-                  style: TextStyle(
-                      fontSize: 11, color: Colors.grey.shade400)),
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
             ),
             const SizedBox(height: 20),
           ],
@@ -343,16 +334,14 @@ class _Pill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding:
-      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
         color: AppColors.primaryLight,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(label,
           style: const TextStyle(
-              color: AppColors.primary,
-              fontWeight: FontWeight.w700)),
+              color: AppColors.primary, fontWeight: FontWeight.w700)),
     );
   }
 }

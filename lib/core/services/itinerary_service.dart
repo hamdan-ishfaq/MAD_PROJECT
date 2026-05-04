@@ -1,13 +1,16 @@
 import 'dart:convert';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
-import 'package:Wanderland/features/planner/models/itinerary_model.dart';
+import 'package:tripgenie/features/planner/models/itinerary_model.dart';
 
-// ItineraryService powered by Grok (xAI)
-
+// ItineraryService powered by Groq Cloud
 class ItineraryService {
-  static const String _apiKey = 'YOUR_API_KEY';
-  static const String _baseUrl = 'https://api.x.ai/v1/chat/completions';
-  static const String _model = 'grok-3-mini';
+  // Use getter so dotenv is read AFTER dotenv.load() runs in main.dart
+  static String get _apiKey => dotenv.env['GROQ_API_KEY'] ?? '';
+  static const String _baseUrl =
+      'https://api.groq.com/openai/v1/chat/completions';
+  static String get _model =>
+      dotenv.env['GROQ_MODEL'] ?? 'llama-3.3-70b-versatile';
 
   static Future<Itinerary?> generateItinerary({
     required String destination,
@@ -55,6 +58,15 @@ Rules:
 ''';
 
     try {
+      // Debug: verify key is loaded
+      if (_apiKey.isEmpty) {
+        print(
+            '[ItineraryService] ERROR: GROQ_API_KEY is empty! Make sure .env is loaded and contains GROQ_API_KEY');
+        return null;
+      }
+      print(
+          '[ItineraryService] API key loaded (${_apiKey.substring(0, 8)}...), calling Groq...');
+
       final response = await http
           .post(
             Uri.parse(_baseUrl),
@@ -76,13 +88,15 @@ Rules:
               'max_tokens': 3000,
             }),
           )
-          .timeout(const Duration(seconds: 30)); // Grok is fast, 30s is plenty
+          .timeout(const Duration(seconds: 60));
+
+      print('[ItineraryService] Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         String rawText = data['choices'][0]['message']['content'] as String;
 
-        // Clean up in case Grok wraps in markdown fences
+        // Clean up in case Groq wraps in markdown fences
         rawText = rawText
             .trim()
             .replaceAll('```json', '')
@@ -90,12 +104,16 @@ Rules:
             .trim();
 
         final Map<String, dynamic> itineraryJson = json.decode(rawText);
+        print(
+            '[ItineraryService] Successfully parsed itinerary for $destination');
         return Itinerary.fromJson(itineraryJson);
       } else {
-        print('Grok API error ${response.statusCode}: ${response.body}');
+        print(
+            '[ItineraryService] Groq API error ${response.statusCode}: ${response.body}');
       }
-    } catch (e) {
-      print('ItineraryService error: $e');
+    } catch (e, stackTrace) {
+      print('[ItineraryService] Exception: $e');
+      print('[ItineraryService] Stack: $stackTrace');
     }
     return null;
   }

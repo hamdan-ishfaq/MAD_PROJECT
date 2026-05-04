@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:Wanderland/core/constants/app_colors.dart';
-import 'package:Wanderland/features/social/models/trip_model.dart';
+import 'package:tripgenie/core/constants/app_colors.dart';
+import 'package:tripgenie/features/social/models/trip_model.dart';
 
 // PostTripScreen  –- Phase 7
 //  User fills in their trip details to appear in the
@@ -20,7 +20,12 @@ class _PostTripScreenState extends State<PostTripScreen> {
   final _endController = TextEditingController();
   int _groupSize = 4;
   final List<String> _allInterests = [
-    'Food', 'History', 'Nature', 'Shopping', 'Art', 'Adventure'
+    'Food',
+    'History',
+    'Nature',
+    'Shopping',
+    'Art',
+    'Adventure'
   ];
   final List<String> _selectedInterests = [];
   bool _isPosting = false;
@@ -48,15 +53,25 @@ class _PostTripScreenState extends State<PostTripScreen> {
       ),
     );
     if (picked != null) {
-      controller.text =
-          '${_monthName(picked.month)} ${picked.day}';
+      controller.text = '${_monthName(picked.month)} ${picked.day}';
     }
   }
 
   String _monthName(int m) {
     const months = [
-      '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      '',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
     ];
     return months[m];
   }
@@ -84,9 +99,7 @@ class _PostTripScreenState extends State<PostTripScreen> {
       endDate: _endController.text,
       groupSize: _groupSize,
       currentMembers: 1,
-      interests: _selectedInterests.isEmpty
-          ? ['Travel']
-          : _selectedInterests,
+      interests: _selectedInterests.isEmpty ? ['Travel'] : _selectedInterests,
       description: _descController.text.trim(),
       postedAgo: 'Just now',
     );
@@ -126,8 +139,7 @@ class _PostTripScreenState extends State<PostTripScreen> {
                   Expanded(
                     child: Text(
                       'Post your trip to find travel buddies heading the same way',
-                      style: TextStyle(
-                          fontSize: 13, color: AppColors.primary),
+                      style: TextStyle(fontSize: 13, color: AppColors.primary),
                     ),
                   ),
                 ],
@@ -159,8 +171,7 @@ class _PostTripScreenState extends State<PostTripScreen> {
                       _TapField(
                         controller: _startController,
                         hint: 'May 10',
-                        onTap: () =>
-                            _pickDate(_startController),
+                        onTap: () => _pickDate(_startController),
                       ),
                     ],
                   ),
@@ -203,8 +214,7 @@ class _PostTripScreenState extends State<PostTripScreen> {
                     ),
                     Text('$_groupSize',
                         style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 18)),
+                            fontWeight: FontWeight.w700, fontSize: 18)),
                     IconButton(
                       onPressed: () {
                         if (_groupSize < 20) {
@@ -228,8 +238,7 @@ class _PostTripScreenState extends State<PostTripScreen> {
               spacing: 8,
               runSpacing: 8,
               children: _allInterests.map((label) {
-                final selected =
-                    _selectedInterests.contains(label);
+                final selected = _selectedInterests.contains(label);
                 return GestureDetector(
                   onTap: () {
                     setState(() {
@@ -240,12 +249,10 @@ class _PostTripScreenState extends State<PostTripScreen> {
                   },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
-                      color: selected
-                          ? AppColors.primary
-                          : Colors.white,
+                      color: selected ? AppColors.primary : Colors.white,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                           color: selected
@@ -254,12 +261,10 @@ class _PostTripScreenState extends State<PostTripScreen> {
                     ),
                     child: Text(label,
                         style: TextStyle(
-                            color: selected
-                                ? Colors.white
-                                : Colors.grey.shade700,
-                            fontWeight: selected
-                                ? FontWeight.w600
-                                : FontWeight.w400,
+                            color:
+                                selected ? Colors.white : Colors.grey.shade700,
+                            fontWeight:
+                                selected ? FontWeight.w600 : FontWeight.w400,
                             fontSize: 13)),
                   ),
                 );
@@ -281,16 +286,14 @@ class _PostTripScreenState extends State<PostTripScreen> {
                 fillColor: Colors.white,
                 border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide:
-                        BorderSide(color: Colors.grey.shade300)),
+                    borderSide: BorderSide(color: Colors.grey.shade300)),
                 enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide:
-                        BorderSide(color: Colors.grey.shade300)),
+                    borderSide: BorderSide(color: Colors.grey.shade300)),
                 focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(
-                        color: AppColors.primary, width: 2)),
+                    borderSide:
+                        const BorderSide(color: AppColors.primary, width: 2)),
               ),
             ),
 
@@ -307,14 +310,11 @@ class _PostTripScreenState extends State<PostTripScreen> {
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(
-                            strokeWidth: 2.5,
-                            color: Colors.white))
+                            strokeWidth: 2.5, color: Colors.white))
                     : const Icon(Icons.send_rounded, size: 18),
-                label: Text(
-                    _isPosting ? 'Posting…' : 'Post My Trip',
+                label: Text(_isPosting ? 'Posting…' : 'Post My Trip',
                     style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600)),
+                        fontSize: 16, fontWeight: FontWeight.w600)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
@@ -339,8 +339,7 @@ class _Label extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(text,
-        style: const TextStyle(
-            fontWeight: FontWeight.w600, fontSize: 14));
+        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14));
   }
 }
 
@@ -349,9 +348,7 @@ class _Field extends StatelessWidget {
   final String hint;
   final IconData prefix;
   const _Field(
-      {required this.controller,
-      required this.hint,
-      required this.prefix});
+      {required this.controller, required this.hint, required this.prefix});
   @override
   Widget build(BuildContext context) {
     return TextField(
@@ -369,8 +366,7 @@ class _Field extends StatelessWidget {
             borderSide: BorderSide(color: Colors.grey.shade300)),
         focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide:
-                const BorderSide(color: AppColors.primary, width: 2)),
+            borderSide: const BorderSide(color: AppColors.primary, width: 2)),
       ),
     );
   }
@@ -381,9 +377,7 @@ class _TapField extends StatelessWidget {
   final String hint;
   final VoidCallback onTap;
   const _TapField(
-      {required this.controller,
-      required this.hint,
-      required this.onTap});
+      {required this.controller, required this.hint, required this.onTap});
   @override
   Widget build(BuildContext context) {
     return TextField(
@@ -404,8 +398,7 @@ class _TapField extends StatelessWidget {
             borderSide: BorderSide(color: Colors.grey.shade300)),
         focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide:
-                const BorderSide(color: AppColors.primary, width: 2)),
+            borderSide: const BorderSide(color: AppColors.primary, width: 2)),
       ),
     );
   }

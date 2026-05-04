@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:Wanderland/core/constants/app_colors.dart';
-import 'package:Wanderland/features/social/models/trip_model.dart';
+import 'package:tripgenie/core/constants/app_colors.dart';
+import 'package:tripgenie/core/services/auth_service.dart';
+import 'package:tripgenie/core/services/chat_persistence_service.dart';
+import 'package:tripgenie/features/social/models/trip_model.dart';
 
 //  ChatScreen    Phase 7
 //  Group chat for a specific trip post.
-//  Messages are local for now; Phase 9 hooks this to a real API.
+//  Messages persist locally using SharedPreferences
 
 class ChatScreen extends StatefulWidget {
   final TripPost trip;
@@ -18,13 +20,51 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final _msgController = TextEditingController();
   final _scrollController = ScrollController();
-  late List<ChatMessage> _messages;
+  List<ChatMessage> _messages = [];
   bool _isSending = false;
+  String _currentUserName = 'You';
+  String _currentUserInitials = 'ME';
 
   @override
   void initState() {
     super.initState();
-    _messages = TripRepository.getSampleChat(widget.trip.id);
+    _initializeData();
+  }
+
+  Future<void> _initializeData() async {
+    await _loadCurrentUser();
+    await _loadMessages();
+  }
+
+  Future<void> _loadCurrentUser() async {
+    final user = await AuthService.loadUser();
+    if (mounted && user != null) {
+      setState(() {
+        _currentUserName =
+            user.name.isNotEmpty ? user.name : user.email.split('@')[0];
+        _currentUserInitials = _currentUserName.length >= 2
+            ? _currentUserName.substring(0, 2).toUpperCase()
+            : _currentUserName.toUpperCase();
+      });
+    }
+  }
+
+  Future<void> _loadMessages() async {
+    final messages = await ChatPersistenceService.loadMessages(widget.trip.id);
+    
+    // Dynamically recalculate isMe based on the current user
+    final updatedMessages = messages.map((m) => ChatMessage(
+      id: m.id,
+      senderName: m.senderName,
+      senderInitials: m.senderInitials,
+      text: m.text,
+      timestamp: m.timestamp,
+      isMe: m.senderName == _currentUserName || m.senderName == 'You',
+    )).toList();
+
+    setState(() {
+      _messages = updatedMessages;
+    });
     // Scroll to bottom after frame
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
   }
@@ -43,22 +83,26 @@ class _ChatScreenState extends State<ChatScreen> {
     final text = _msgController.text.trim();
     if (text.isEmpty) return;
 
+    final newMessage = ChatMessage(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      senderName: _currentUserName,
+      senderInitials: _currentUserInitials,
+      text: text,
+      timestamp: DateTime.now(),
+      isMe: true,
+    );
+
     setState(() {
-      _messages.add(ChatMessage(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        senderName: 'You',
-        senderInitials: 'ME',
-        text: text,
-        timestamp: DateTime.now(),
-        isMe: true,
-      ));
+      _messages.add(newMessage);
       _isSending = false;
     });
 
+    // Save to persistent storage
+    ChatPersistenceService.saveMessages(widget.trip.id, _messages);
+
     _msgController.clear();
     // Scroll after the new message renders
-    WidgetsBinding.instance
-        .addPostFrameCallback((_) => _scrollToBottom());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
   }
 
   @override
@@ -79,12 +123,12 @@ class _ChatScreenState extends State<ChatScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(widget.trip.destination,
-                style: const TextStyle(
-                    fontWeight: FontWeight.w700, fontSize: 16)),
+                style:
+                    const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
             Text(
               '${widget.trip.startDate} – ${widget.trip.endDate} · ${widget.trip.currentMembers} members',
-              style: const TextStyle(
-                  fontSize: 11, color: AppColors.textSecondary),
+              style:
+                  const TextStyle(fontSize: 11, color: AppColors.textSecondary),
             ),
           ],
         ),
@@ -92,8 +136,7 @@ class _ChatScreenState extends State<ChatScreen> {
           // Members count chip
           Container(
             margin: const EdgeInsets.only(right: 12),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
               color: AppColors.primaryLight,
               borderRadius: BorderRadius.circular(16),
@@ -117,8 +160,7 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           // Trip info strip
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             color: Colors.white,
             child: Row(
               children: [
@@ -131,8 +173,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary),
+                        fontSize: 12, color: AppColors.textSecondary),
                   ),
                 ),
               ],
@@ -149,8 +190,7 @@ class _ChatScreenState extends State<ChatScreen> {
               itemBuilder: (context, i) {
                 final msg = _messages[i];
                 final showDate = i == 0 ||
-                    _messages[i - 1].timestamp.day !=
-                        msg.timestamp.day;
+                    _messages[i - 1].timestamp.day != msg.timestamp.day;
                 return Column(
                   children: [
                     if (showDate) _DateDivider(msg.timestamp),
@@ -217,9 +257,24 @@ class _MessageBubble extends StatelessWidget {
   final ChatMessage message;
   const _MessageBubble({required this.message});
 
+  Color _getUserColor(String name) {
+    final colors = [
+      const Color(0xFFEF4444),
+      const Color(0xFF3B82F6),
+      const Color(0xFF10B981),
+      const Color(0xFFF59E0B),
+      const Color(0xFF8B5CF6),
+      const Color(0xFF14B8A6),
+      const Color(0xFFEC4899),
+    ];
+    final index = name.hashCode % colors.length;
+    return colors[index.abs()];
+  }
+
   @override
   Widget build(BuildContext context) {
     final isMe = message.isMe;
+    final userColor = _getUserColor(message.senderName);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -232,7 +287,7 @@ class _MessageBubble extends StatelessWidget {
           if (!isMe) ...[
             CircleAvatar(
               radius: 15,
-              backgroundColor: AppColors.primary,
+              backgroundColor: userColor,
               child: Text(message.senderInitials,
                   style: const TextStyle(
                       color: Colors.white,
@@ -245,26 +300,23 @@ class _MessageBubble extends StatelessWidget {
           // Bubble
           Flexible(
             child: Column(
-              crossAxisAlignment: isMe
-                  ? CrossAxisAlignment.end
-                  : CrossAxisAlignment.start,
+              crossAxisAlignment:
+                  isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
               children: [
                 if (!isMe)
                   Padding(
                     padding: const EdgeInsets.only(left: 4, bottom: 2),
                     child: Text(message.senderName,
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary)),
+                            fontWeight: FontWeight.w700,
+                            color: userColor)),
                   ),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
-                    color: isMe
-                        ? AppColors.primary
-                        : Colors.white,
+                    color: isMe ? const Color(0xFFDCF8C6) : Colors.white,
                     borderRadius: BorderRadius.only(
                       topLeft: const Radius.circular(16),
                       topRight: const Radius.circular(16),
@@ -279,10 +331,9 @@ class _MessageBubble extends StatelessWidget {
                     ],
                   ),
                   child: Text(message.text,
-                      style: TextStyle(
+                      style: const TextStyle(
                           fontSize: 14,
-                          color:
-                              isMe ? Colors.white : AppColors.textPrimary,
+                          color: Colors.black87,
                           height: 1.4)),
                 ),
                 Padding(
@@ -321,8 +372,8 @@ class _DateDivider extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Text(label,
-                style: const TextStyle(
-                    fontSize: 11, color: AppColors.textHint)),
+                style:
+                    const TextStyle(fontSize: 11, color: AppColors.textHint)),
           ),
           const Expanded(child: Divider(color: AppColors.border)),
         ],

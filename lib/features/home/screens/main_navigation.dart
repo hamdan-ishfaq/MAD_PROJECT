@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:Wanderland/core/constants/app_colors.dart';
-import 'package:Wanderland/core/constants/app_strings.dart';
-import 'package:Wanderland/features/discovery/screens/discovery_hub_screen.dart';
-import 'package:Wanderland/features/map/screens/map_screen.dart';
-import 'package:Wanderland/features/planner/screens/planner_screen.dart';
-import 'package:Wanderland/features/social/screens/travelers_screen.dart';  
-import 'package:Wanderland/features/profile/screens/profile_screen.dart';
+import 'package:tripgenie/core/constants/app_colors.dart';
+import 'package:tripgenie/core/constants/app_strings.dart';
+import 'package:tripgenie/features/discovery/screens/discovery_hub_screen.dart';
+import 'package:tripgenie/features/map/screens/map_screen.dart';
+import 'package:tripgenie/features/planner/screens/planner_screen.dart';
+import 'package:tripgenie/features/social/screens/travelers_screen.dart';
+import 'package:tripgenie/features/profile/screens/profile_screen.dart';
 
 // MainNavigation
 
@@ -48,7 +48,7 @@ class _MainNavigationState extends State<MainNavigation> {
     _NavItem(
       icon: Icons.group_outlined,
       activeIcon: Icons.group_rounded,
-      label: 'Buddies',     // Phase 7 tab
+      label: 'Buddies', // Phase 7 tab
     ),
     _NavItem(
       icon: Icons.person_outline_rounded,
@@ -106,7 +106,7 @@ class _MainNavigationState extends State<MainNavigation> {
                           Text(
                             item.label,
                             style: TextStyle(
-                              fontSize: 10,  // slightly smaller for 5 tabs
+                              fontSize: 10, // slightly smaller for 5 tabs
                               fontWeight: isSelected
                                   ? FontWeight.w600
                                   : FontWeight.w400,

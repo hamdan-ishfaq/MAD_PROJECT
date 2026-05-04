@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:Wanderland/core/constants/app_colors.dart';
+import 'package:tripgenie/core/constants/app_colors.dart';
 
 class AppTheme {
   AppTheme._();
@@ -140,7 +140,8 @@ class AppTheme {
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: Colors.red),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         hintStyle: GoogleFonts.inter(
           fontSize: 14,
           color: AppColors.textHint,

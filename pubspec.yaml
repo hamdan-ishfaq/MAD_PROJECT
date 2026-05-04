@@ -22,6 +22,7 @@ dependencies:
 
   # Local storage
   shared_preferences: ^2.2.2
+  flutter_dotenv: ^5.1.0
 
   # Maps (FREE - OpenStreetMap)
   flutter_map: ^6.1.0
@@ -43,12 +44,25 @@ dependencies:
   permission_handler: ^11.3.0
   geolocator: ^11.0.0
 
-dev_dependencies:
-  flutter_test:
-    sdk: flutter
-  flutter_lints: ^3.0.0
+  # Real-time Chat (Phase 9)
+  web_socket_channel: ^2.4.0
+
+  # PDF Export (Phase 11)
+  pdf: ^3.10.0
+  printing: ^5.12.0
+  share_plus: ^7.2.1
+
+  # Offline Support (Phase 12)
+  sqflite: ^2.4.0
+  path_provider: ^2.1.0
 
 flutter:
   uses-material-design: true
   assets:
+    - .env
     - assets/images/
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0

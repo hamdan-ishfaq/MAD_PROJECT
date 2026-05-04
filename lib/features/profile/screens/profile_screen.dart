@@ -1,11 +1,65 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:Wanderland/core/constants/app_colors.dart';
-import 'package:Wanderland/core/constants/app_strings.dart';
-import 'package:Wanderland/core/routes/app_routes.dart';
+import 'package:tripgenie/core/constants/app_colors.dart';
+import 'package:tripgenie/core/constants/app_strings.dart';
+import 'package:tripgenie/core/models/dashboard_model.dart';
+import 'package:tripgenie/core/routes/app_routes.dart';
+import 'package:tripgenie/core/services/auth_service.dart';
+import 'package:tripgenie/core/services/auth_api_service.dart';
+import 'package:tripgenie/core/services/dashboard_service.dart';
+import 'package:tripgenie/core/services/offline_db_service.dart';
+import 'package:tripgenie/features/dashboard/widgets/saved_itineraries_list.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  String _userName = 'Explorer';
+  String _userEmail = '';
+  String _userInitials = 'EX';
+  String _userId = 'guest';
+  late Future<List<SavedItinerary>> _savedItinerariesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _savedItinerariesFuture = Future.value(const []);
+    _loadUser();
+  }
+
+  Future<void> _loadUser() async {
+    final user = await AuthService.loadUser();
+    if (user != null && mounted) {
+      setState(() {
+        _userId = user.id;
+        _userName = user.name.isNotEmpty ? user.name : user.email.split('@')[0];
+        _userEmail = user.email;
+        _userInitials = _userName.length >= 2
+            ? _userName.substring(0, 2).toUpperCase()
+            : _userName.toUpperCase();
+        _savedItinerariesFuture = _loadSavedItineraries(user.id);
+      });
+    } else if (mounted) {
+      setState(() {
+        _savedItinerariesFuture = _loadSavedItineraries(_userId);
+      });
+    }
+  }
+
+  Future<List<SavedItinerary>> _loadSavedItineraries(String userId) async {
+    final remote = await DashboardService.getSavedItineraries(userId);
+    if (remote.isNotEmpty) return remote;
+    return OfflineDbService.getLocalItineraries(userId);
+  }
+
+  void _handleLogout() async {
+    await AuthApiService.logout();
+    if (mounted) context.go(AppRoutes.login);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,18 +84,18 @@ class ProfileScreen extends StatelessWidget {
             Container(
               width: 88,
               height: 88,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
                   colors: AppColors.splashGradient,
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 shape: BoxShape.circle,
               ),
-              child: const Center(
+              child: Center(
                 child: Text(
-                  'AJ',
-                  style: TextStyle(
+                  _userInitials,
+                  style: const TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
@@ -51,18 +105,18 @@ class ProfileScreen extends StatelessWidget {
             ),
 
             const SizedBox(height: 14),
-            const Text(
-              'Alex Johnson',
-              style: TextStyle(
+            Text(
+              _userName,
+              style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 4),
-            const Text(
-              'Level 12 Explorer',
-              style: TextStyle(
+            Text(
+              _userEmail.isNotEmpty ? _userEmail : 'Guest Explorer',
+              style: const TextStyle(
                 fontSize: 13,
                 color: AppColors.textSecondary,
               ),
@@ -127,9 +181,65 @@ class ProfileScreen extends StatelessWidget {
                       color: AppColors.primary, size: 20),
                 ),
                 title: const Text('Your saved places appear here',
-                    style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                    style: TextStyle(
+                        fontSize: 13, color: AppColors.textSecondary)),
                 trailing: const Icon(Icons.chevron_right_rounded,
                     color: AppColors.textHint),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            _ProfileSection(
+              title: 'Saved Itineraries',
+              child: FutureBuilder<List<SavedItinerary>>(
+                future: _savedItinerariesFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+
+                  final itineraries = snapshot.data ?? const [];
+                  if (itineraries.isEmpty) {
+                    return const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'No saved itineraries yet',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Generate one in the planner and tap Save.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textHint,
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+
+                  return SavedItinerariesList(
+                    itineraries: itineraries,
+                    onDelete: (id) async {
+                      await DashboardService.deleteItinerary(id, _userId);
+                      await OfflineDbService.deleteLocalItinerary(id);
+                      if (mounted) {
+                        setState(() {
+                          _savedItinerariesFuture =
+                              _loadSavedItineraries(_userId);
+                        });
+                      }
+                    },
+                  );
+                },
               ),
             ),
 
@@ -139,7 +249,7 @@ class ProfileScreen extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: () => context.go(AppRoutes.login),
+                onPressed: _handleLogout,
                 icon: const Icon(Icons.logout_rounded, size: 18),
                 label: const Text('Log Out'),
                 style: OutlinedButton.styleFrom(

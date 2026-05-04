@@ -1,71 +1,111 @@
 import 'package:flutter/material.dart';
-import 'package:Wanderland/core/constants/app_colors.dart';
-import 'package:Wanderland/core/services/itinerary_service.dart';
-import 'package:Wanderland/features/planner/screens/itinerary_result_screen.dart';
+import 'package:tripgenie/core/constants/app_colors.dart';
+import 'package:tripgenie/core/models/dashboard_model.dart';
+import 'package:tripgenie/core/services/auth_service.dart';
+import 'package:tripgenie/core/services/dashboard_service.dart';
+import 'package:tripgenie/core/services/offline_db_service.dart';
+import 'package:tripgenie/features/planner/models/itinerary_model.dart';
 
-class PlannerScreen extends StatefulWidget {
-  const PlannerScreen({super.key});
+class ItineraryResultScreen extends StatefulWidget {
+  final Itinerary itinerary;
+
+  const ItineraryResultScreen({
+    super.key,
+    required this.itinerary,
+  });
 
   @override
-  State<PlannerScreen> createState() => _PlannerScreenState();
+  State<ItineraryResultScreen> createState() => _ItineraryResultScreenState();
 }
 
-class _PlannerScreenState extends State<PlannerScreen> {
-  final _destinationController = TextEditingController();
-  int _days = 3;
-  double _budget = 500;
-  bool _isLoading = false;
+class _ItineraryResultScreenState extends State<ItineraryResultScreen> {
+  bool _isSaving = false;
 
-  final List<Map<String, dynamic>> _allInterests = [
-    {'label': 'Food',      'icon': Icons.restaurant_outlined},
-    {'label': 'History',   'icon': Icons.museum_outlined},
-    {'label': 'Nature',    'icon': Icons.park_outlined},
-    {'label': 'Shopping',  'icon': Icons.shopping_bag_outlined},
-    {'label': 'Art',       'icon': Icons.palette_outlined},
-    {'label': 'Adventure', 'icon': Icons.hiking_outlined},
-  ];
-  final List<String> _selectedInterests = [];
-
-  @override
-  void dispose() {
-    _destinationController.dispose();
-    super.dispose();
+  Map<String, dynamic> _itineraryToJson(Itinerary itinerary) {
+    return {
+      'destination': itinerary.destination,
+      'days': itinerary.days,
+      'budget': itinerary.budget,
+      'summary': itinerary.summary,
+      'day_plans': itinerary.dayPlans
+          .map(
+            (dayPlan) => {
+              'day': dayPlan.day,
+              'date': dayPlan.date,
+              'activities': dayPlan.activities
+                  .map(
+                    (activity) => {
+                      'time': activity.time,
+                      'title': activity.title,
+                      'description': activity.description,
+                      'type': activity.type,
+                    },
+                  )
+                  .toList(),
+            },
+          )
+          .toList(),
+    };
   }
 
-  Future<void> _generateItinerary() async {
-    if (_destinationController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a destination')),
+  Future<void> _saveItinerary() async {
+    if (_isSaving) return;
+
+    setState(() => _isSaving = true);
+
+    try {
+      final user = await AuthService.loadUser();
+      final userId = user?.id ?? 'guest';
+      final itineraryJson = _itineraryToJson(widget.itinerary);
+
+      final saved = await DashboardService.saveItinerary(
+        userId: userId,
+        destination: widget.itinerary.destination,
+        days: widget.itinerary.days,
+        budget: widget.itinerary.budget,
+        summary: widget.itinerary.summary,
+        itineraryJson: itineraryJson,
       );
-      return;
-    }
 
-    setState(() => _isLoading = true);
+      final localSaved = SavedItinerary(
+        id: saved?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        userId: userId,
+        destination: widget.itinerary.destination,
+        days: widget.itinerary.days,
+        budget: widget.itinerary.budget,
+        summary: widget.itinerary.summary,
+        itinerary: itineraryJson,
+        status: 'planned',
+        isFavorite: false,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
 
-    final itinerary = await ItineraryService.generateItinerary(
-      destination: _destinationController.text.trim(),
-      days: _days,
-      budget: _budget,
-      interests:
-      _selectedInterests.isEmpty ? ['General'] : _selectedInterests,
-    );
+      await OfflineDbService.saveItineraryLocally(localSaved);
 
-    setState(() => _isLoading = false);
-    if (!mounted) return;
-
-    if (itinerary != null) {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => ItineraryResultScreen(itinerary: itinerary),
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            saved != null
+                ? 'Itinerary saved to your profile.'
+                : 'Saved locally. Backend was unavailable.',
+          ),
+          backgroundColor: Colors.green,
         ),
       );
-    } else {
+    } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not generate. Check your Grok API key.'),
-          backgroundColor: Colors.redAccent,
+        SnackBar(
+          content: Text('Could not save itinerary: $e'),
+          backgroundColor: Colors.red,
         ),
       );
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 
@@ -74,16 +114,17 @@ class _PlannerScreenState extends State<PlannerScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('AI Trip Planner'),
+        title: const Text('Your Itinerary'),
         backgroundColor: Colors.white,
         elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.black),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Banner
+            // Header Card
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
@@ -93,25 +134,39 @@ class _PlannerScreenState extends State<PlannerScreen> {
                 ),
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: const Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.auto_awesome_rounded,
-                      color: Colors.white, size: 28),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Powered by Grok AI',
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 16)),
-                        Text('Day-by-day plans with weather forecasts',
-                            style:
-                            TextStyle(color: Colors.white70, fontSize: 12)),
-                      ],
+                  Text(
+                    widget.itinerary.destination,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 28,
                     ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.itinerary.summary,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _InfoChip(
+                        icon: Icons.calendar_today_rounded,
+                        label: '${widget.itinerary.days} Days',
+                      ),
+                      _InfoChip(
+                        icon: Icons.attach_money_rounded,
+                        label:
+                            '\$${widget.itinerary.budget.toStringAsFixed(0)}',
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -119,217 +174,59 @@ class _PlannerScreenState extends State<PlannerScreen> {
 
             const SizedBox(height: 28),
 
-            // Destination
-            const Text('Where do you want to go?',
-                style:
-                TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _destinationController,
-              decoration: InputDecoration(
-                hintText: 'e.g. Paris, Lahore, Bangkok',
-                prefixIcon: const Icon(Icons.flight_takeoff_rounded,
-                    color: AppColors.primary),
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide:
-                    BorderSide(color: Colors.grey.shade300)),
-                enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide:
-                    BorderSide(color: Colors.grey.shade300)),
-                focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(
-                        color: AppColors.primary, width: 2)),
-                filled: true,
-                fillColor: Colors.white,
+            // Day Plans
+            const Text(
+              'Day-by-Day Plan',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 18,
               ),
             ),
+            const SizedBox(height: 16),
 
-            const SizedBox(height: 24),
-
-            // Days
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Number of Days',
-                    style: TextStyle(
-                        fontWeight: FontWeight.w600, fontSize: 15)),
-                _Pill(label: '$_days days'),
-              ],
-            ),
-            Slider(
-              value: _days.toDouble(),
-              min: 1,
-              max: 14,
-              divisions: 13,
-              activeColor: AppColors.primary,
-              onChanged: (v) => setState(() => _days = v.round()),
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('1 day',
-                    style: TextStyle(
-                        fontSize: 11, color: Colors.grey.shade500)),
-                Text('14 days',
-                    style: TextStyle(
-                        fontSize: 11, color: Colors.grey.shade500)),
-              ],
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: widget.itinerary.dayPlans.length,
+              itemBuilder: (context, index) {
+                final dayPlan = widget.itinerary.dayPlans[index];
+                return _DayPlanCard(dayPlan: dayPlan);
+              },
             ),
 
             const SizedBox(height: 20),
 
-            // Budget
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Total Budget',
-                    style: TextStyle(
-                        fontWeight: FontWeight.w600, fontSize: 15)),
-                _Pill(label: '\$${_budget.round()}'),
-              ],
-            ),
-            Slider(
-              value: _budget,
-              min: 100,
-              max: 5000,
-              divisions: 49,
-              activeColor: AppColors.primary,
-              onChanged: (v) => setState(() => _budget = v),
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('\$100',
-                    style: TextStyle(
-                        fontSize: 11, color: Colors.grey.shade500)),
-                Text('\$5000',
-                    style: TextStyle(
-                        fontSize: 11, color: Colors.grey.shade500)),
-              ],
-            ),
-
-            const SizedBox(height: 24),
-
-            // Interests
-            const Text('Your Interests',
-                style:
-                TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-            const SizedBox(height: 4),
-            Text('Select all that apply',
-                style: TextStyle(
-                    fontSize: 12, color: Colors.grey.shade500)),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _allInterests.map((item) {
-                final label = item['label'] as String;
-                final icon  = item['icon']  as IconData;
-                final selected = _selectedInterests.contains(label);
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      selected
-                          ? _selectedInterests.remove(label)
-                          : _selectedInterests.add(label);
-                    });
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? AppColors.primary
-                          : Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                          color: selected
-                              ? AppColors.primary
-                              : Colors.grey.shade300),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(icon,
-                            size: 15,
-                            color: selected
-                                ? Colors.white
-                                : Colors.grey.shade600),
-                        const SizedBox(width: 6),
-                        Text(label,
-                            style: TextStyle(
-                                color: selected
-                                    ? Colors.white
-                                    : Colors.grey.shade700,
-                                fontWeight: selected
-                                    ? FontWeight.w600
-                                    : FontWeight.w400,
-                                fontSize: 13)),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-
-            const SizedBox(height: 36),
-
-            // Generate button
+            // Save Button
             SizedBox(
               width: double.infinity,
-              height: 54,
+              height: 52,
               child: ElevatedButton(
-                onPressed: _isLoading ? null : _generateItinerary,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
-                  elevation: 0,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                child: _isLoading
-                    ? const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
+                onPressed: _isSaving ? null : _saveItinerary,
+                child: _isSaving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
                           strokeWidth: 2.5,
-                          color: Colors.white),
-                    ),
-                    SizedBox(width: 12),
-                    Text('Grok is planning your trip…',
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'Save This Itinerary',
                         style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600)),
-                  ],
-                )
-                    : const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.auto_awesome_rounded, size: 20),
-                    SizedBox(width: 8),
-                    Text('Generate My Itinerary',
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600)),
-                  ],
-                ),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
               ),
             ),
-
-            const SizedBox(height: 14),
-            Center(
-              child: Text('Powered by Grok · xAI',
-                  style: TextStyle(
-                      fontSize: 11, color: Colors.grey.shade400)),
-            ),
-            const SizedBox(height: 20),
           ],
         ),
       ),
@@ -337,22 +234,162 @@ class _PlannerScreenState extends State<PlannerScreen> {
   }
 }
 
-class _Pill extends StatelessWidget {
+class _InfoChip extends StatelessWidget {
+  final IconData icon;
   final String label;
-  const _Pill({required this.label});
+
+  const _InfoChip({
+    required this.icon,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, color: Colors.white, size: 18),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DayPlanCard extends StatefulWidget {
+  final DayPlan dayPlan;
+
+  const _DayPlanCard({required this.dayPlan});
+
+  @override
+  State<_DayPlanCard> createState() => _DayPlanCardState();
+}
+
+class _DayPlanCardState extends State<_DayPlanCard> {
+  bool _isExpanded = false;
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding:
-      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: AppColors.primaryLight,
-        borderRadius: BorderRadius.circular(20),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
       ),
-      child: Text(label,
-          style: const TextStyle(
-              color: AppColors.primary,
-              fontWeight: FontWeight.w700)),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () {
+              setState(() {
+                _isExpanded = !_isExpanded;
+              });
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Day ${widget.dayPlan.day}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                    ),
+                  ),
+                  Icon(
+                    _isExpanded
+                        ? Icons.expand_less_rounded
+                        : Icons.expand_more_rounded,
+                    color: AppColors.primary,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_isExpanded)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(12),
+                  bottomRight: Radius.circular(12),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: widget.dayPlan.activities.length,
+                    itemBuilder: (context, index) {
+                      final activity = widget.dayPlan.activities[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    activity.time,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 12,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    activity.title,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 0),
+                              child: Text(
+                                activity.description,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:Wanderland/core/theme/app_theme.dart';
-import 'package:Wanderland/core/routes/app_routes.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:tripgenie/core/theme/app_theme.dart';
+import 'package:tripgenie/core/routes/app_routes.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load environment variables (.env) — REQUIRED for Groq, OpenTripMap, etc.
+  await dotenv.load(fileName: ".env");
 
   // Locking to portrait mode
   await SystemChrome.setPreferredOrientations([
