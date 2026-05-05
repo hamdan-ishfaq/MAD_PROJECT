@@ -37,6 +37,7 @@ class _ChatScreenState extends State<ChatScreen> {
   WebSocketService? _webSocketService;
   StreamSubscription<ChatMessage>? _messageSubscription;
   StreamSubscription<bool>? _connectionSubscription;
+  StreamSubscription<String>? _systemNotificationSubscription;
 
   @override
   void initState() {
@@ -124,7 +125,9 @@ class _ChatScreenState extends State<ChatScreen> {
   List<ChatMessage> _mergeMessages(List<ChatMessage> messages) {
     final merged = <String, ChatMessage>{};
     for (final message in messages) {
-      merged[message.id] = message;
+      if (message.senderName != 'System') {
+        merged[message.id] = message;
+      }
     }
     final result = merged.values.toList()
       ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
@@ -148,6 +151,15 @@ class _ChatScreenState extends State<ChatScreen> {
         setState(() {
           _isRealtimeConnected = connected;
         });
+      },
+    );
+    _systemNotificationSubscription = _webSocketService!.systemNotificationStream.listen(
+      (text) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(text),
+          duration: const Duration(seconds: 2),
+        ));
       },
     );
 
@@ -224,6 +236,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void dispose() {
     _messageSubscription?.cancel();
     _connectionSubscription?.cancel();
+    _systemNotificationSubscription?.cancel();
     _webSocketService?.dispose();
     _msgController.dispose();
     _scrollController.dispose();

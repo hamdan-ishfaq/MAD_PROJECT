@@ -28,6 +28,8 @@ class WebSocketService {
       StreamController<bool>.broadcast();
   final StreamController<String> _typingController =
       StreamController<String>.broadcast();
+  final StreamController<String> _systemNotificationController =
+      StreamController<String>.broadcast();
 
   /// Stream of incoming chat messages
   Stream<ChatMessage> get messageStream => _messageController.stream;
@@ -37,6 +39,9 @@ class WebSocketService {
 
   /// Stream of typing indicators (user name who is typing)
   Stream<String> get typingStream => _typingController.stream;
+
+  /// Stream of system notifications (e.g. joined/left)
+  Stream<String> get systemNotificationStream => _systemNotificationController.stream;
 
   bool get isConnected => _isConnected;
 
@@ -131,6 +136,7 @@ class WebSocketService {
     _messageController.close();
     _connectionController.close();
     _typingController.close();
+    _systemNotificationController.close();
   }
 
   // ─── Private helpers ───
@@ -160,28 +166,16 @@ class WebSocketService {
           }
           break;
 
-        case 'user_joined':
-          final joinMsg = ChatMessage(
-            id: 'sys_${DateTime.now().millisecondsSinceEpoch}',
-            senderName: 'System',
-            senderInitials: '🔔',
-            text: '${data['user_name'] ?? 'A user'} joined the chat',
-            timestamp: DateTime.now(),
-            isMe: false,
-          );
-          _messageController.add(joinMsg);
-          break;
-
-        case 'user_left':
-          final leftMsg = ChatMessage(
-            id: 'sys_${DateTime.now().millisecondsSinceEpoch}',
-            senderName: 'System',
-            senderInitials: '🔔',
-            text: '${data['user_name'] ?? 'A user'} left the chat',
-            timestamp: DateTime.now(),
-            isMe: false,
-          );
-          _messageController.add(leftMsg);
+        case 'system_notification':
+          final event = data['event'];
+          final name = data['user_name'] ?? 'A user';
+          if (data['user_id'] != userId) {
+            if (event == 'user_joined') {
+              _systemNotificationController.add('$name joined the chat');
+            } else if (event == 'user_left') {
+              _systemNotificationController.add('$name left the chat');
+            }
+          }
           break;
 
         case 'pong':

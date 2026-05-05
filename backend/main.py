@@ -410,7 +410,8 @@ class ConnectionManager:
         })
         # Notify others
         await self.broadcast(trip_id, json.dumps({
-            "type": "user_joined",
+            "type": "system_notification",
+            "event": "user_joined",
             "user_id": user_id,
             "user_name": user_name,
             "timestamp": datetime.utcnow().isoformat(),
@@ -469,7 +470,8 @@ async def websocket_chat(websocket: WebSocket, trip_id: str, user_id: str = "", 
     except WebSocketDisconnect:
         manager.disconnect(trip_id, user_id)
         await manager.broadcast(trip_id, json.dumps({
-            "type": "user_left",
+            "type": "system_notification",
+            "event": "user_left",
             "user_id": user_id,
             "user_name": user_name,
             "timestamp": datetime.utcnow().isoformat(),
