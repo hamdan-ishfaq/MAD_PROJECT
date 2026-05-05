@@ -1,0 +1,45 @@
+name: Android CI/CD Pipeline
+
+# This triggers the action whenever you push to the 'main' branch
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Grab your code from the repository
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 2. Install Java (required for Android)
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      # 3. Install Flutter
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      # 4. Download Flutter packages
+      - name: Install Dependencies
+        run: flutter pub get
+
+      # 5. Build the Android APK!
+      - name: Build APK
+        run: flutter build apk --release
+
+      # 6. Upload the finished app to Firebase
+      - name: Upload to Firebase App Distribution
+        uses: wzieba/Firebase-Distribution-Github-Action@v1
+        with:
+          appId: ${{ secrets.FIREBASE_APP_ID }}
+          serviceCredentialsFileContent: ${{ secrets.FIREBASE_CREDENTIAL_JSON }}
+          groups: testers
+          file: build/app/outputs/flutter-apk/app-release.apk
