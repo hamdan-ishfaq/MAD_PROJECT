@@ -27,15 +27,19 @@ jobs:
         with:
           channel: 'stable'
 
-      # 4. Download Flutter packages
+      # 4. NEW STEP: Create the .env file securely from GitHub Secrets
+      - name: Create .env file
+        run: echo "${{ secrets.ENV_FILE_CONTENT }}" > .env
+
+      # 5. Download Flutter packages
       - name: Install Dependencies
         run: flutter pub get
 
-      # 5. Build the Android APK!
+      # 6. Build the Android APK!
       - name: Build APK
         run: flutter build apk --release
 
-      # 6. Upload the finished app to Firebase
+      # 7. Upload the finished app to Firebase
       - name: Upload to Firebase App Distribution
         uses: wzieba/Firebase-Distribution-Github-Action@v1
         with:
