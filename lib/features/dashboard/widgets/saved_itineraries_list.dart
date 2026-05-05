@@ -2,16 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:tripgenie/core/constants/app_colors.dart';
 import 'package:tripgenie/core/models/dashboard_model.dart';
+import 'package:tripgenie/features/dashboard/screens/saved_itinerary_detail_screen.dart';
 
 /// Vertical list of saved itineraries shown on the dashboard
 class SavedItinerariesList extends StatelessWidget {
   final List<SavedItinerary> itineraries;
   final void Function(String id)? onDelete;
+  final void Function(SavedItinerary itinerary)? onTap;
 
   const SavedItinerariesList({
     Key? key,
     required this.itineraries,
     this.onDelete,
+    this.onTap,
   }) : super(key: key);
 
   Color _statusColor(String status) {
@@ -60,85 +63,101 @@ class SavedItinerariesList extends StatelessWidget {
             ),
             child: const Icon(Icons.delete_outline, color: Colors.red),
           ),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Row(
-              children: [
-                // Status icon
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: _statusColor(item.status).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    _statusIcon(item.status),
-                    color: _statusColor(item.status),
-                    size: 22,
-                  ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () {
+              if (onTap != null) {
+                onTap!(item);
+                return;
+              }
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => SavedItineraryDetailScreen(itinerary: item),
                 ),
-                const SizedBox(width: 14),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Row(
+                children: [
+                  // Status icon
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: _statusColor(item.status).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      _statusIcon(item.status),
+                      color: _statusColor(item.status),
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
 
-                // Info
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  // Info
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.destination,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${item.days} days · \$${item.budget.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Date + status
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text(
-                        item.destination,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: _statusColor(item.status).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          item.status[0].toUpperCase() +
+                              item.status.substring(1),
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: _statusColor(item.status),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${item.days} days · \$${item.budget.toStringAsFixed(0)}',
+                        DateFormat('MMM d').format(item.createdAt),
                         style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
+                          fontSize: 11,
+                          color: AppColors.textHint,
                         ),
                       ),
                     ],
                   ),
-                ),
-
-                // Date + status
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: _statusColor(item.status).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        item.status[0].toUpperCase() + item.status.substring(1),
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: _statusColor(item.status),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      DateFormat('MMM d').format(item.createdAt),
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textHint,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );

@@ -4,6 +4,9 @@ import 'package:tripgenie/core/models/dashboard_model.dart';
 import 'package:tripgenie/core/services/auth_service.dart';
 import 'package:tripgenie/core/services/dashboard_service.dart';
 import 'package:tripgenie/core/services/offline_db_service.dart';
+import 'package:tripgenie/core/services/api_service.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'package:tripgenie/features/planner/models/itinerary_model.dart';
 
 class ItineraryResultScreen extends StatefulWidget {
@@ -20,14 +23,134 @@ class ItineraryResultScreen extends StatefulWidget {
 
 class _ItineraryResultScreenState extends State<ItineraryResultScreen> {
   bool _isSaving = false;
+  bool _isLoadingWeather = true;
+  String? _weatherSummary;
+  String? _weatherError;
 
-  Map<String, dynamic> _itineraryToJson(Itinerary itinerary) {
-    return {
-      'destination': itinerary.destination,
-      'days': itinerary.days,
-      'budget': itinerary.budget,
-      'summary': itinerary.summary,
-      'day_plans': itinerary.dayPlans
+  @override
+  void initState() {
+    super.initState();
+    _fetchWeather();
+  }
+
+  Future<void> _fetchWeather() async {
+    try {
+      final coordinates =
+          await _resolveCoordinates(widget.itinerary.destination);
+      if (coordinates == null) {
+        if (!mounted) return;
+        setState(() {
+          _weatherError = 'Weather unavailable for this destination.';
+          _isLoadingWeather = false;
+        });
+        return;
+      }
+
+      final uri = Uri.parse(
+        'https://api.open-meteo.com/v1/forecast?latitude=${coordinates['lat']}&longitude=${coordinates['lng']}&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto',
+      );
+      final response = await http.get(uri).timeout(const Duration(seconds: 10));
+      if (response.statusCode != 200) {
+        throw Exception('Open-Meteo request failed');
+      }
+
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      final daily = decoded['daily'] as Map<String, dynamic>?;
+      final temperaturesMax = (daily?['temperature_2m_max'] as List<dynamic>?);
+      final temperaturesMin = (daily?['temperature_2m_min'] as List<dynamic>?);
+      final weatherCodes = (daily?['weather_code'] as List<dynamic>?);
+
+      final summary = _buildWeatherSummary(
+        _firstNumberValue(weatherCodes)?.toInt(),
+        _firstNumberValue(temperaturesMax)?.toDouble(),
+        _firstNumberValue(temperaturesMin)?.toDouble(),
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _weatherSummary = summary;
+        _isLoadingWeather = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _weatherError = 'Weather unavailable right now.';
+        _isLoadingWeather = false;
+      });
+    }
+  }
+
+  Future<Map<String, double>?> _resolveCoordinates(String destination) async {
+    final uri = Uri.parse(
+      'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${Uri.encodeComponent(destination)}',
+    );
+    final response = await http.get(uri, headers: {
+      'User-Agent': 'wanderland-app'
+    }).timeout(const Duration(seconds: 10));
+
+    if (response.statusCode != 200) return null;
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! List || decoded.isEmpty) return null;
+
+    final first = decoded.first as Map<String, dynamic>;
+    final latitude = double.tryParse(first['lat']?.toString() ?? '');
+    final longitude = double.tryParse(first['lon']?.toString() ?? '');
+    if (latitude == null || longitude == null) return null;
+
+    return {'lat': latitude, 'lng': longitude};
+  }
+
+  num? _firstNumberValue(List<dynamic>? values) {
+    if (values == null || values.isEmpty) return null;
+    final first = values.first;
+    return first is num ? first : num.tryParse(first.toString());
+  }
+
+  String _buildWeatherSummary(
+      int? weatherCode, double? maxTemp, double? minTemp) {
+    final description = switch (weatherCode) {
+      0 => 'Clear sky',
+      1 || 2 => 'Partly cloudy',
+      3 => 'Cloudy',
+      45 || 48 => 'Foggy',
+      51 || 53 || 55 => 'Drizzle',
+      61 || 63 || 65 => 'Rain',
+      71 || 73 || 75 => 'Snow',
+      80 || 81 || 82 => 'Showers',
+      95 || 96 || 99 => 'Thunderstorm',
+      _ => 'Forecast available',
+    };
+
+    final tempText = maxTemp != null && minTemp != null
+        ? '${maxTemp.toStringAsFixed(0)}° / ${minTemp.toStringAsFixed(0)}°'
+        : 'Temperature unavailable';
+
+    return '$description • $tempText';
+  }
+
+  Future<void> _saveItinerary() async {
+    if (_isSaving) return;
+
+    final user = await AuthService.loadUser();
+    if (!mounted) return;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please sign in to save this itinerary.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    final itineraryJson = {
+      'destination': widget.itinerary.destination,
+      'days': widget.itinerary.days,
+      'budget': widget.itinerary.budget,
+      'summary': widget.itinerary.summary,
+      'day_plans': widget.itinerary.dayPlans
           .map(
             (dayPlan) => {
               'day': dayPlan.day,
@@ -46,67 +169,47 @@ class _ItineraryResultScreenState extends State<ItineraryResultScreen> {
           )
           .toList(),
     };
-  }
 
-  Future<void> _saveItinerary() async {
-    if (_isSaving) return;
+    final saved = await DashboardService.saveItinerary(
+      userId: user.id,
+      destination: widget.itinerary.destination,
+      days: widget.itinerary.days,
+      budget: widget.itinerary.budget,
+      summary: widget.itinerary.summary,
+      itineraryJson: itineraryJson,
+    );
 
-    setState(() => _isSaving = true);
+    final record = saved ??
+        SavedItinerary(
+          id: '${user.id}_${DateTime.now().millisecondsSinceEpoch}',
+          userId: user.id,
+          destination: widget.itinerary.destination,
+          days: widget.itinerary.days,
+          budget: widget.itinerary.budget,
+          summary: widget.itinerary.summary,
+          itinerary: itineraryJson,
+          status: 'planned',
+          isFavorite: false,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
 
-    try {
-      final user = await AuthService.loadUser();
-      final userId = user?.id ?? 'guest';
-      final itineraryJson = _itineraryToJson(widget.itinerary);
+    await OfflineDbService.saveItineraryLocally(record);
 
-      final saved = await DashboardService.saveItinerary(
-        userId: userId,
-        destination: widget.itinerary.destination,
-        days: widget.itinerary.days,
-        budget: widget.itinerary.budget,
-        summary: widget.itinerary.summary,
-        itineraryJson: itineraryJson,
-      );
+    if (!mounted) return;
+    setState(() {
+      _isSaving = false;
+    });
 
-      final localSaved = SavedItinerary(
-        id: saved?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-        userId: userId,
-        destination: widget.itinerary.destination,
-        days: widget.itinerary.days,
-        budget: widget.itinerary.budget,
-        summary: widget.itinerary.summary,
-        itinerary: itineraryJson,
-        status: 'planned',
-        isFavorite: false,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
-
-      await OfflineDbService.saveItineraryLocally(localSaved);
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            saved != null
-                ? 'Itinerary saved to your profile.'
-                : 'Saved locally. Backend was unavailable.',
-          ),
-          backgroundColor: Colors.green,
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          saved == null
+              ? 'Saved locally. Will sync when the backend is available.'
+              : 'Itinerary saved successfully.',
         ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Could not save itinerary: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isSaving = false);
-      }
-    }
+      ),
+    );
   }
 
   @override
@@ -114,118 +217,91 @@ class _ItineraryResultScreenState extends State<ItineraryResultScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Your Itinerary'),
+        title: Text(widget.itinerary.destination),
         backgroundColor: Colors.white,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
+        actions: [
+          TextButton.icon(
+            onPressed: _isSaving ? null : _saveItinerary,
+            icon: _isSaving
+                ? const SizedBox(
+                    height: 16,
+                    width: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.bookmark_add_outlined),
+            label: Text(_isSaving ? 'Saving' : 'Save'),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header Card
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF1A73E8), Color(0xFF00C897)],
-                ),
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade200),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    widget.itinerary.destination,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 28,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
                     widget.itinerary.summary,
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                    ),
+                    style: const TextStyle(fontSize: 15, height: 1.5),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       _InfoChip(
-                        icon: Icons.calendar_today_rounded,
-                        label: '${widget.itinerary.days} Days',
-                      ),
+                          icon: Icons.calendar_month,
+                          label: '${widget.itinerary.days} days'),
+                      const SizedBox(width: 8),
                       _InfoChip(
-                        icon: Icons.attach_money_rounded,
-                        label:
-                            '\$${widget.itinerary.budget.toStringAsFixed(0)}',
-                      ),
+                          icon: Icons.payments_outlined,
+                          label:
+                              '\$${widget.itinerary.budget.toStringAsFixed(0)}'),
                     ],
                   ),
                 ],
               ),
             ),
-
-            const SizedBox(height: 28),
-
-            // Day Plans
-            const Text(
-              'Day-by-Day Plan',
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 18,
+            const SizedBox(height: 16),
+            Text(
+              'Weather',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade200),
               ),
+              child: _isLoadingWeather
+                  ? const Center(child: CircularProgressIndicator())
+                  : Text(_weatherSummary ??
+                      _weatherError ??
+                      'Weather unavailable.'),
             ),
             const SizedBox(height: 16),
-
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: widget.itinerary.dayPlans.length,
-              itemBuilder: (context, index) {
-                final dayPlan = widget.itinerary.dayPlans[index];
-                return _DayPlanCard(dayPlan: dayPlan);
-              },
-            ),
-
-            const SizedBox(height: 20),
-
-            // Save Button
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            Text(
+              'Daily Plan',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
                   ),
-                ),
-                onPressed: _isSaving ? null : _saveItinerary,
-                child: _isSaving
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text(
-                        'Save This Itinerary',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-              ),
+            ),
+            const SizedBox(height: 8),
+            ...widget.itinerary.dayPlans.map(
+              (dayPlan) => _DayPlanCard(dayPlan: dayPlan),
             ),
           ],
         ),

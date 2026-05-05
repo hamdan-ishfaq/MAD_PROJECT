@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tripgenie/features/social/models/trip_model.dart';
+import 'package:tripgenie/core/services/notification_service.dart';
 
 // Chat message persistence service using SharedPreferences
 class ChatPersistenceService {
@@ -66,6 +67,22 @@ class ChatPersistenceService {
       print('Error adding message: $e');
       return false;
     }
+  }
+
+  // Add a message and send a local notification for messages from others
+  static Future<bool> addMessageWithNotify(
+      String tripId, ChatMessage message) async {
+    final saved = await addMessage(tripId, message);
+    if (saved && !message.isMe) {
+      await NotificationService.showNotification(
+        id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
+        title: message.senderName,
+        body: message.text.length > 120
+            ? '${message.text.substring(0, 117)}...'
+            : message.text,
+      );
+    }
+    return saved;
   }
 
   // Clear all messages for a trip

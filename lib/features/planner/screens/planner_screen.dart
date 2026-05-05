@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:tripgenie/core/constants/app_colors.dart';
+import 'package:tripgenie/core/services/auth_service.dart';
 import 'package:tripgenie/core/services/itinerary_service.dart';
+import 'package:tripgenie/core/services/user_preferences_service.dart';
 import 'package:tripgenie/features/planner/screens/itinerary_result_screen.dart';
 
 class PlannerScreen extends StatefulWidget {
@@ -15,6 +17,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
   int _days = 3;
   double _budget = 500;
   bool _isLoading = false;
+  List<String> _profileInterests = [];
 
   final List<Map<String, dynamic>> _allInterests = [
     {'label': 'Food', 'icon': Icons.restaurant_outlined},
@@ -25,6 +28,22 @@ class _PlannerScreenState extends State<PlannerScreen> {
     {'label': 'Adventure', 'icon': Icons.hiking_outlined},
   ];
   final List<String> _selectedInterests = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfileInterests();
+  }
+
+  Future<void> _loadProfileInterests() async {
+    final user = await AuthService.loadUser();
+    final userId = user?.id ?? 'guest';
+    final savedInterests = await UserPreferencesService.getInterests(userId);
+    if (!mounted) return;
+    setState(() {
+      _profileInterests = savedInterests;
+    });
+  }
 
   @override
   void dispose() {
@@ -43,13 +62,21 @@ class _PlannerScreenState extends State<PlannerScreen> {
     setState(() => _isLoading = true);
 
     // Debug: verify API key is loaded
-    debugPrint('[Planner] Generating itinerary for ${_destinationController.text.trim()}');
+    debugPrint(
+        '[Planner] Generating itinerary for ${_destinationController.text.trim()}');
+
+    final primaryInterests =
+        _selectedInterests.isEmpty ? ['General'] : _selectedInterests;
+    final secondaryInterests = _profileInterests
+        .where((item) => !primaryInterests.contains(item))
+        .toList();
 
     final itinerary = await ItineraryService.generateItinerary(
       destination: _destinationController.text.trim(),
       days: _days,
       budget: _budget,
-      interests: _selectedInterests.isEmpty ? ['General'] : _selectedInterests,
+      interests: primaryInterests,
+      secondaryInterests: secondaryInterests,
     );
 
     setState(() => _isLoading = false);
@@ -64,7 +91,8 @@ class _PlannerScreenState extends State<PlannerScreen> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Could not generate itinerary. Make sure the backend is running and your Groq API key is valid.'),
+          content: Text(
+              'Could not generate itinerary. Make sure the backend is running and your Groq API key is valid.'),
           backgroundColor: Colors.redAccent,
           duration: Duration(seconds: 4),
         ),
@@ -212,6 +240,38 @@ class _PlannerScreenState extends State<PlannerScreen> {
             ),
 
             const SizedBox(height: 24),
+
+            if (_profileInterests.isNotEmpty) ...[
+              const Text('Profile Interests (Secondary Suggestions)',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+              const SizedBox(height: 4),
+              Text('Used as backup context when generating itineraries',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _profileInterests
+                    .map(
+                      (item) => Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppColors.background,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Text(item,
+                            style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w500)),
+                      ),
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: 20),
+            ],
 
             // Interests
             const Text('Your Interests',

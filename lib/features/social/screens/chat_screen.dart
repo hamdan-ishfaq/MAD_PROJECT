@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:tripgenie/core/constants/app_colors.dart';
 import 'package:tripgenie/core/services/auth_service.dart';
 import 'package:tripgenie/core/services/chat_persistence_service.dart';
+import 'package:tripgenie/core/services/chat_room_state_service.dart';
 import 'package:tripgenie/features/social/models/trip_model.dart';
 
 //  ChatScreen    Phase 7
@@ -22,6 +23,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final _scrollController = ScrollController();
   List<ChatMessage> _messages = [];
   bool _isSending = false;
+  bool _isJoined = false;
   String _currentUserName = 'You';
   String _currentUserInitials = 'ME';
 
@@ -34,6 +36,13 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _initializeData() async {
     await _loadCurrentUser();
     await _loadMessages();
+    await ChatRoomStateService.joinRoom(widget.trip.id);
+    await ChatRoomStateService.markRead(widget.trip.id);
+    if (mounted) {
+      setState(() {
+        _isJoined = true;
+      });
+    }
   }
 
   Future<void> _loadCurrentUser() async {
@@ -51,16 +60,18 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _loadMessages() async {
     final messages = await ChatPersistenceService.loadMessages(widget.trip.id);
-    
+
     // Dynamically recalculate isMe based on the current user
-    final updatedMessages = messages.map((m) => ChatMessage(
-      id: m.id,
-      senderName: m.senderName,
-      senderInitials: m.senderInitials,
-      text: m.text,
-      timestamp: m.timestamp,
-      isMe: m.senderName == _currentUserName || m.senderName == 'You',
-    )).toList();
+    final updatedMessages = messages
+        .map((m) => ChatMessage(
+              id: m.id,
+              senderName: m.senderName,
+              senderInitials: m.senderInitials,
+              text: m.text,
+              timestamp: m.timestamp,
+              isMe: m.senderName == _currentUserName || m.senderName == 'You',
+            ))
+        .toList();
 
     setState(() {
       _messages = updatedMessages;
@@ -99,6 +110,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
     // Save to persistent storage
     ChatPersistenceService.saveMessages(widget.trip.id, _messages);
+    ChatRoomStateService.joinRoom(widget.trip.id);
+    ChatRoomStateService.markRead(widget.trip.id);
 
     _msgController.clear();
     // Scroll after the new message renders
@@ -133,9 +146,26 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
         ),
         actions: [
+          if (_isJoined)
+            Container(
+              margin: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.primaryLight,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Text(
+                'Joined',
+                style: TextStyle(
+                  color: AppColors.primary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
           // Members count chip
           Container(
-            margin: const EdgeInsets.only(right: 12),
+            margin: const EdgeInsets.only(right: 8),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
               color: AppColors.primaryLight,
@@ -153,6 +183,26 @@ class _ChatScreenState extends State<ChatScreen> {
                         fontSize: 12)),
               ],
             ),
+          ),
+          PopupMenuButton<String>(
+            onSelected: (v) async {
+              if (v == 'leave') {
+                await ChatRoomStateService.leaveRoom(widget.trip.id);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Left chat room')),
+                  );
+                  setState(() {
+                    _isJoined = false;
+                  });
+                  Navigator.of(context).pop();
+                }
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(value: 'leave', child: Text('Leave Room')),
+            ],
+            icon: const Icon(Icons.more_vert, color: AppColors.textPrimary),
           ),
         ],
       ),
@@ -332,9 +382,7 @@ class _MessageBubble extends StatelessWidget {
                   ),
                   child: Text(message.text,
                       style: const TextStyle(
-                          fontSize: 14,
-                          color: Colors.black87,
-                          height: 1.4)),
+                          fontSize: 14, color: Colors.black87, height: 1.4)),
                 ),
                 Padding(
                   padding: const EdgeInsets.only(top: 3, left: 4, right: 4),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:go_router/go_router.dart';
 import 'package:tripgenie/core/constants/app_colors.dart';
 import 'package:tripgenie/core/constants/app_strings.dart';
@@ -8,6 +9,7 @@ import 'package:tripgenie/core/services/auth_service.dart';
 import 'package:tripgenie/core/services/auth_api_service.dart';
 import 'package:tripgenie/core/services/dashboard_service.dart';
 import 'package:tripgenie/core/services/offline_db_service.dart';
+import 'package:tripgenie/core/services/user_preferences_service.dart';
 import 'package:tripgenie/features/dashboard/widgets/saved_itineraries_list.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -22,13 +24,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _userEmail = '';
   String _userInitials = 'EX';
   String _userId = 'guest';
+  List<String> _interests = const [
+    'Hiking',
+    'Vinyl Records',
+    'Jazz',
+    'Specialty Coffee',
+    'Urban Sketching',
+    'Night Markets',
+  ];
   late Future<List<SavedItinerary>> _savedItinerariesFuture;
+  late Future<List<String>> _favoritesFuture;
+  StreamSubscription<void>? _changesSubscription;
 
   @override
   void initState() {
     super.initState();
     _savedItinerariesFuture = Future.value(const []);
+    _favoritesFuture = Future.value(const []);
+    _changesSubscription = OfflineDbService.changes.listen((_) {
+      if (mounted) {
+        setState(() {
+          _savedItinerariesFuture = _loadSavedItineraries(_userId);
+          _favoritesFuture = _loadFavoritePlaces(_userId);
+        });
+      }
+    });
     _loadUser();
+  }
+
+  @override
+  void dispose() {
+    _changesSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadUser() async {
@@ -42,21 +69,94 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ? _userName.substring(0, 2).toUpperCase()
             : _userName.toUpperCase();
         _savedItinerariesFuture = _loadSavedItineraries(user.id);
+        _favoritesFuture = _loadFavoritePlaces(user.id);
       });
+      await _loadInterests(user.id);
     } else if (mounted) {
       setState(() {
         _savedItinerariesFuture = _loadSavedItineraries(_userId);
+        _favoritesFuture = _loadFavoritePlaces(_userId);
       });
+      await _loadInterests(_userId);
     }
+  }
+
+  Future<void> _loadInterests(String userId) async {
+    final saved = await UserPreferencesService.getInterests(userId);
+    if (!mounted || saved.isEmpty) return;
+    setState(() {
+      _interests = saved;
+    });
+  }
+
+  Future<void> _saveInterests() async {
+    await UserPreferencesService.saveInterests(_userId, _interests);
+  }
+
+  Future<void> _addInterestDialog() async {
+    final controller = TextEditingController();
+    final value = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add Interest'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: 'e.g. Street Food, Museums, Trekking',
+          ),
+          onSubmitted: (v) => Navigator.of(context).pop(v.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+
+    if (value == null || value.isEmpty) return;
+    if (_interests.contains(value)) return;
+
+    setState(() {
+      _interests = [..._interests, value];
+    });
+    await _saveInterests();
+  }
+
+  Future<void> _removeInterest(String value) async {
+    setState(() {
+      _interests = _interests.where((item) => item != value).toList();
+    });
+    await _saveInterests();
   }
 
   Future<List<SavedItinerary>> _loadSavedItineraries(String userId) async {
     final remote = await DashboardService.getSavedItineraries(userId);
-    if (remote.isNotEmpty) return remote;
-    return OfflineDbService.getLocalItineraries(userId);
+    final local = await OfflineDbService.getLocalItineraries(userId);
+    final merged = <String, SavedItinerary>{};
+
+    for (final item in [...local, ...remote]) {
+      merged[item.id] = item;
+    }
+
+    final values = merged.values.toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return values;
   }
 
-  void _handleLogout() async {
+  Future<List<String>> _loadFavoritePlaces(String userId) async {
+    final remote = await DashboardService.getFavorites(userId);
+    final local = await OfflineDbService.getLocalFavorites(userId);
+    return {...remote, ...local}.toList();
+  }
+
+  Future<void> _handleLogout() async {
     await AuthApiService.logout();
     if (mounted) context.go(AppRoutes.login);
   }
@@ -72,7 +172,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined),
-            onPressed: () {},
+            onPressed: () {
+              showModalBottomSheet(
+                context: context,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                ),
+                builder: (context) => Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ListTile(
+                        leading: const Icon(Icons.palette_outlined),
+                        title: const Text('Theme'),
+                        subtitle: const Text('Light / Dark / System'),
+                        onTap: () {},
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.notifications_none_outlined),
+                        title: const Text('Notifications'),
+                        subtitle: const Text('Manage notification settings'),
+                        onTap: () {},
+                      ),
+                      const Divider(),
+                      ListTile(
+                        leading:
+                            const Icon(Icons.logout_rounded, color: Colors.red),
+                        title: const Text('Log Out',
+                            style: TextStyle(color: Colors.red)),
+                        onTap: () async {
+                          Navigator.of(context).pop();
+                          await _handleLogout();
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -149,16 +287,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
             // Interests
             _ProfileSection(
               title: 'Interests & Hobbies',
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: const [
-                  _InterestChip('Hiking', AppColors.accent),
-                  _InterestChip('Vinyl Records', Color(0xFF6366F1)),
-                  _InterestChip('Jazz', Color(0xFFF59E0B)),
-                  _InterestChip('Specialty Coffee', Color(0xFF8B5CF6)),
-                  _InterestChip('Urban Sketching', AppColors.primary),
-                  _InterestChip('Night Markets', Color(0xFFEC4899)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _interests
+                        .map(
+                          (label) => Chip(
+                            label: Text(label),
+                            labelStyle: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textPrimary,
+                            ),
+                            backgroundColor: AppColors.background,
+                            side: const BorderSide(color: AppColors.border),
+                            onDeleted: () => _removeInterest(label),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: _addInterestDialog,
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('Add Interest'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: AppColors.primary),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -168,23 +327,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
             // My Favorites
             _ProfileSection(
               title: AppStrings.myFavorites,
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryLight,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.bookmark_outline_rounded,
-                      color: AppColors.primary, size: 20),
-                ),
-                title: const Text('Your saved places appear here',
-                    style: TextStyle(
-                        fontSize: 13, color: AppColors.textSecondary)),
-                trailing: const Icon(Icons.chevron_right_rounded,
-                    color: AppColors.textHint),
+              child: FutureBuilder<List<String>>(
+                future: _favoritesFuture,
+                builder: (context, snapshot) {
+                  final favorites = snapshot.data ?? const [];
+                  if (favorites.isEmpty) {
+                    return const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('No saved places yet',
+                            style: TextStyle(
+                                fontSize: 13, color: AppColors.textSecondary)),
+                        SizedBox(height: 4),
+                        Text('Save places from the map to see them here.',
+                            style: TextStyle(
+                                fontSize: 12, color: AppColors.textHint)),
+                      ],
+                    );
+                  }
+
+                  return Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: favorites
+                        .map(
+                          (placeId) => Chip(
+                            avatar: const Icon(Icons.bookmark_rounded,
+                                size: 16, color: AppColors.primary),
+                            label: Text(placeId),
+                            backgroundColor: AppColors.primaryLight,
+                          ),
+                        )
+                        .toList(),
+                  );
+                },
               ),
             ),
 
@@ -244,21 +420,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
 
             const SizedBox(height: 24),
-
-            // Logout
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: _handleLogout,
-                icon: const Icon(Icons.logout_rounded, size: 18),
-                label: const Text('Log Out'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red,
-                  side: const BorderSide(color: Colors.red),
-                  minimumSize: const Size(double.infinity, 48),
-                ),
-              ),
-            ),
           ],
         ),
       ),
@@ -333,31 +494,6 @@ class _ProfileSection extends StatelessWidget {
           const SizedBox(height: 14),
           child,
         ],
-      ),
-    );
-  }
-}
-
-class _InterestChip extends StatelessWidget {
-  final String label;
-  final Color color;
-  const _InterestChip(this.label, this.color);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
-          color: color,
-        ),
       ),
     );
   }

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:tripgenie/core/constants/app_colors.dart';
 import 'package:tripgenie/core/models/dashboard_model.dart';
+import 'package:tripgenie/core/services/auth_service.dart';
 import 'package:tripgenie/core/services/dashboard_service.dart';
+import 'package:tripgenie/core/services/offline_db_service.dart';
 import 'package:tripgenie/features/dashboard/widgets/stats_card.dart';
 import 'package:tripgenie/features/dashboard/widgets/saved_itineraries_list.dart';
 
@@ -15,21 +18,56 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   late Future<UserDashboard?> _dashboardFuture;
   late Future<List<SavedItinerary>> _itinerariesFuture;
+  StreamSubscription<void>? _changesSubscription;
 
-  // TODO: Replace with actual user ID from auth
-  final String _userId = 'user_1';
+  String _userId = 'guest';
 
   @override
   void initState() {
     super.initState();
-    _dashboardFuture = DashboardService.getDashboard(_userId);
-    _itinerariesFuture = DashboardService.getSavedItineraries(_userId);
+    _dashboardFuture = Future.value(null);
+    _itinerariesFuture = Future.value(const []);
+    _changesSubscription = OfflineDbService.changes.listen((_) {
+      if (mounted) {
+        _refresh();
+      }
+    });
+    _initData();
+  }
+
+  @override
+  void dispose() {
+    _changesSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _initData() async {
+    final user = await AuthService.loadUser();
+    if (!mounted) return;
+    setState(() {
+      _userId = user?.id ?? 'guest';
+    });
+    _refresh();
+  }
+
+  Future<List<SavedItinerary>> _loadSavedItineraries(String userId) async {
+    final remote = await DashboardService.getSavedItineraries(userId);
+    final local = await OfflineDbService.getLocalItineraries(userId);
+    final merged = <String, SavedItinerary>{};
+
+    for (final item in [...local, ...remote]) {
+      merged[item.id] = item;
+    }
+
+    final values = merged.values.toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return values;
   }
 
   void _refresh() {
     setState(() {
       _dashboardFuture = DashboardService.getDashboard(_userId);
-      _itinerariesFuture = DashboardService.getSavedItineraries(_userId);
+      _itinerariesFuture = _loadSavedItineraries(_userId);
     });
   }
 
@@ -187,7 +225,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       child: Column(
                         children: [
-                          Icon(Icons.map_outlined, size: 48, color: Colors.grey.shade300),
+                          Icon(Icons.map_outlined,
+                              size: 48, color: Colors.grey.shade300),
                           const SizedBox(height: 12),
                           const Text(
                             'No saved itineraries yet',
@@ -196,7 +235,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           const SizedBox(height: 4),
                           const Text(
                             'Generate your first trip in the AI Planner!',
-                            style: TextStyle(fontSize: 12, color: AppColors.textHint),
+                            style: TextStyle(
+                                fontSize: 12, color: AppColors.textHint),
                           ),
                         ],
                       ),

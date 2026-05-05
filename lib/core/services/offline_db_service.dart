@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:sqflite/sqflite.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:tripgenie/core/models/place_model.dart';
@@ -10,6 +11,16 @@ class OfflineDbService {
   static Database? _database;
   static const String _dbName = 'wanderland_offline.db';
   static const int _dbVersion = 1;
+  static final StreamController<void> _changesController =
+      StreamController<void>.broadcast();
+
+  static Stream<void> get changes => _changesController.stream;
+
+  static void _notifyChanged() {
+    if (!_changesController.isClosed) {
+      _changesController.add(null);
+    }
+  }
 
   /// Get (or create) the database singleton
   static Future<Database> get database async {
@@ -129,7 +140,8 @@ class OfflineDbService {
     final List<Map<String, dynamic>> maps;
 
     if (category != null) {
-      maps = await db.query('places', where: 'category = ?', whereArgs: [category]);
+      maps = await db
+          .query('places', where: 'category = ?', whereArgs: [category]);
     } else {
       maps = await db.query('places');
     }
@@ -181,7 +193,8 @@ class OfflineDbService {
       website: map['website'] as String?,
       highlights: [],
       openingHours: [],
-      updatedAt: DateTime.tryParse(map['cached_at'] as String? ?? '') ?? DateTime.now(),
+      updatedAt: DateTime.tryParse(map['cached_at'] as String? ?? '') ??
+          DateTime.now(),
     );
   }
 
@@ -206,6 +219,7 @@ class OfflineDbService {
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+    _notifyChanged();
   }
 
   static Future<List<SavedItinerary>> getLocalItineraries(String userId) async {
@@ -217,24 +231,31 @@ class OfflineDbService {
       orderBy: 'created_at DESC',
     );
 
-    return maps.map((map) => SavedItinerary(
-      id: map['id'] as String,
-      userId: map['user_id'] as String,
-      destination: map['destination'] as String,
-      days: map['days'] as int,
-      budget: (map['budget'] as num).toDouble(),
-      summary: map['summary'] as String? ?? '',
-      itinerary: jsonDecode(map['itinerary_json'] as String? ?? '{}'),
-      status: map['status'] as String? ?? 'planned',
-      isFavorite: (map['is_favorite'] as int?) == 1,
-      createdAt: DateTime.tryParse(map['created_at'] as String? ?? '') ?? DateTime.now(),
-      updatedAt: DateTime.tryParse(map['updated_at'] as String? ?? '') ?? DateTime.now(),
-    )).toList();
+    return maps
+        .map((map) => SavedItinerary(
+              id: map['id'] as String,
+              userId: map['user_id'] as String,
+              destination: map['destination'] as String,
+              days: map['days'] as int,
+              budget: (map['budget'] as num).toDouble(),
+              summary: map['summary'] as String? ?? '',
+              itinerary: jsonDecode(map['itinerary_json'] as String? ?? '{}'),
+              status: map['status'] as String? ?? 'planned',
+              isFavorite: (map['is_favorite'] as int?) == 1,
+              createdAt:
+                  DateTime.tryParse(map['created_at'] as String? ?? '') ??
+                      DateTime.now(),
+              updatedAt:
+                  DateTime.tryParse(map['updated_at'] as String? ?? '') ??
+                      DateTime.now(),
+            ))
+        .toList();
   }
 
   static Future<void> deleteLocalItinerary(String id) async {
     final db = await database;
     await db.delete('saved_itineraries', where: 'id = ?', whereArgs: [id]);
+    _notifyChanged();
   }
 
   // ─── Favorites ───
@@ -250,6 +271,7 @@ class OfflineDbService {
       },
       conflictAlgorithm: ConflictAlgorithm.ignore,
     );
+    _notifyChanged();
   }
 
   static Future<void> removeLocalFavorite(String userId, String placeId) async {
@@ -259,17 +281,20 @@ class OfflineDbService {
       where: 'place_id = ? AND user_id = ?',
       whereArgs: [placeId, userId],
     );
+    _notifyChanged();
   }
 
   static Future<List<String>> getLocalFavorites(String userId) async {
     final db = await database;
-    final maps = await db.query('favorites', where: 'user_id = ?', whereArgs: [userId]);
+    final maps =
+        await db.query('favorites', where: 'user_id = ?', whereArgs: [userId]);
     return maps.map((m) => m['place_id'] as String).toList();
   }
 
   // ─── Sync Queue ───
 
-  static Future<void> addToSyncQueue(String operation, String tableName, Map<String, dynamic> data) async {
+  static Future<void> addToSyncQueue(
+      String operation, String tableName, Map<String, dynamic> data) async {
     final db = await database;
     await db.insert('sync_queue', {
       'operation': operation,
@@ -282,12 +307,14 @@ class OfflineDbService {
 
   static Future<List<Map<String, dynamic>>> getPendingSyncOps() async {
     final db = await database;
-    return await db.query('sync_queue', where: 'synced = 0', orderBy: 'created_at ASC');
+    return await db.query('sync_queue',
+        where: 'synced = 0', orderBy: 'created_at ASC');
   }
 
   static Future<void> markSynced(int id) async {
     final db = await database;
-    await db.update('sync_queue', {'synced': 1}, where: 'id = ?', whereArgs: [id]);
+    await db.update('sync_queue', {'synced': 1},
+        where: 'id = ?', whereArgs: [id]);
   }
 
   // ─── Utility ───

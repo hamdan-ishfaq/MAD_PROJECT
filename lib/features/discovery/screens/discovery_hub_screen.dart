@@ -3,6 +3,9 @@ import 'package:go_router/go_router.dart';
 import 'package:tripgenie/core/constants/app_colors.dart';
 import 'package:tripgenie/core/constants/app_strings.dart';
 import 'package:tripgenie/core/routes/app_routes.dart';
+import 'package:tripgenie/core/services/auth_service.dart';
+import 'package:tripgenie/core/services/dashboard_service.dart';
+import 'package:tripgenie/core/services/offline_db_service.dart';
 import 'package:tripgenie/core/services/api_service.dart';
 import 'package:tripgenie/features/social/widgets/community_updates_sheet.dart';
 
@@ -33,20 +36,34 @@ class _DiscoveryHubScreenState extends State<DiscoveryHubScreen> {
     }
   }
 
-  static const List<Map<String, dynamic>> _topVisited = [
-    {'name': 'Faisal Mosque', 'visits': '12.4k', 'icon': Icons.mosque_rounded},
-    {
-      'name': 'Pakistan Monument',
-      'visits': '9.1k',
-      'icon': Icons.account_balance_rounded
-    },
-    {'name': 'Daman-e-Koh', 'visits': '8.7k', 'icon': Icons.landscape_rounded},
-    {
-      'name': 'Monal Restaurant',
-      'visits': '7.3k',
-      'icon': Icons.restaurant_rounded
-    },
-  ];
+  List<Map<String, dynamic>> get _topVisited {
+    if (_trendingPlaces.isEmpty) return [];
+    final list = List<Map<String, dynamic>>.from(_trendingPlaces);
+    // Prefer explicit 'visits' if provided, otherwise use crowdLevel/rating
+    list.sort((a, b) {
+      final aScore = (a['visits'] is num)
+          ? (a['visits'] as num).toDouble()
+          : ((a['crowdLevel'] is num)
+              ? (a['crowdLevel'] as num).toDouble()
+              : (a['rating'] as num?)?.toDouble() ?? 0.0);
+      final bScore = (b['visits'] is num)
+          ? (b['visits'] as num).toDouble()
+          : ((b['crowdLevel'] is num)
+              ? (b['crowdLevel'] as num).toDouble()
+              : (b['rating'] as num?)?.toDouble() ?? 0.0);
+      return bScore.compareTo(aScore);
+    });
+    return list
+        .take(4)
+        .map((p) => {
+              'name': p['name'] ?? 'Unknown',
+              'visits': (p['visits'] != null)
+                  ? p['visits'].toString()
+                  : '${((p['crowdLevel'] ?? 0.0) * 100).toStringAsFixed(0)}',
+              'icon': Icons.place_rounded,
+            })
+        .toList();
+  }
 
   String _getGreeting() {
     final hour = DateTime.now().hour;
@@ -67,7 +84,8 @@ class _DiscoveryHubScreenState extends State<DiscoveryHubScreen> {
             SliverAppBar(
               floating: true,
               snap: true,
-              backgroundColor: Colors.white,
+              backgroundColor: AppColors.background.withOpacity(0.92),
+              surfaceTintColor: Colors.transparent,
               elevation: 0,
               title: Row(
                 children: [
@@ -80,7 +98,14 @@ class _DiscoveryHubScreenState extends State<DiscoveryHubScreen> {
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
-                      borderRadius: BorderRadius.circular(9),
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withOpacity(0.18),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
                     ),
                     child: const Center(
                       child: Text(
@@ -153,6 +178,13 @@ class _DiscoveryHubScreenState extends State<DiscoveryHubScreen> {
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(color: AppColors.border),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.03),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
                         child: const Row(
                           children: [
@@ -196,13 +228,13 @@ class _DiscoveryHubScreenState extends State<DiscoveryHubScreen> {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Icon(Icons.explore_off_rounded,
-                                      size: 40, color: Colors.grey.shade300),
+                                      size: 40, color: Colors.grey.shade400),
                                   const SizedBox(height: 8),
                                   Text(
                                     'Start the backend to see places',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
-                                      color: Colors.grey.shade400,
+                                      color: Colors.grey.shade600,
                                       fontSize: 13,
                                     ),
                                   ),
@@ -267,7 +299,7 @@ class _SectionHeader extends StatelessWidget {
           title,
           style: const TextStyle(
             fontSize: 17,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w800,
             color: AppColors.textPrimary,
           ),
         ),
@@ -280,7 +312,7 @@ class _SectionHeader extends StatelessWidget {
           ),
           child: const Text(
             AppStrings.seeAll,
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
           ),
         ),
       ],
@@ -333,105 +365,156 @@ class _TrendingCard extends StatelessWidget {
         );
       },
       borderRadius: BorderRadius.circular(18),
-      child: Container(
-        width: 180,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              height: 100,
-              decoration: BoxDecoration(
-                color: Color(colorValue).withOpacity(0.15),
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(18)),
-              ),
-              child: Center(
-                child: Icon(
-                  Icons.place_rounded,
-                  color: Color(colorValue),
-                  size: 36,
+      child: Stack(
+        children: [
+          Container(
+            width: 180,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppColors.border),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
                 ),
-              ),
+              ],
             ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    placeName,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: Color(colorValue).withOpacity(0.15),
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(18)),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    place['category'] as String? ?? 'Category',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
+                  child: Center(
+                    child: Icon(
+                      Icons.place_rounded,
+                      color: Color(colorValue),
+                      size: 36,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Row(
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: _crowdColor.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 6,
-                              height: 6,
-                              decoration: BoxDecoration(
-                                color: _crowdColor,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              _crowdLabel,
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: _crowdColor,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Spacer(),
-                      const Icon(Icons.star_rounded,
-                          color: Color(0xFFFBBF24), size: 13),
-                      const SizedBox(width: 2),
                       Text(
-                        '${place['rating'] ?? 4.0}',
+                        placeName,
                         style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
                           color: AppColors.textPrimary,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        place['category'] as String? ?? 'Category',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: _crowdColor.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                    color: _crowdColor,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _crowdLabel,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: _crowdColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Spacer(),
+                          const Icon(Icons.star_rounded,
+                              color: Color(0xFFFBBF24), size: 13),
+                          const SizedBox(width: 2),
+                          Text(
+                            '${place['rating'] ?? 4.0}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          Positioned(
+            right: 8,
+            top: 8,
+            child: FutureBuilder(
+              future: AuthService.loadUser(),
+              builder: (context, snap) {
+                return InkWell(
+                  onTap: () async {
+                    final user = snap.data;
+                    final userId = user?.id ?? 'guest';
+                    final saved =
+                        await DashboardService.addFavorite(userId, placeId);
+                    await OfflineDbService.addLocalFavorite(userId, placeId);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text(saved
+                            ? 'Place saved to your profile.'
+                            : 'Saved locally. Backend unavailable.'),
+                      ));
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                            color: Colors.black.withOpacity(0.06),
+                            blurRadius: 6)
+                      ],
+                    ),
+                    child: const Icon(Icons.bookmark_add_outlined,
+                        size: 18, color: AppColors.primary),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -451,6 +534,13 @@ class _TopVisitedTile extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
       child: Row(
         children: [
@@ -482,7 +572,7 @@ class _TopVisitedTile extends StatelessWidget {
               data['name'] as String,
               style: const TextStyle(
                 fontSize: 14,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
               ),
             ),

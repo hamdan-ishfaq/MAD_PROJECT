@@ -55,6 +55,7 @@ dependencies:
   # Offline Support (Phase 12)
   sqflite: ^2.4.0
   path_provider: ^2.1.0
+  flutter_local_notifications: ^21.0.0
 
 flutter:
   uses-material-design: true

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:tripgenie/core/theme/app_theme.dart';
 import 'package:tripgenie/core/routes/app_routes.dart';
+import 'package:tripgenie/core/services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,6 +24,9 @@ void main() async {
       statusBarIconBrightness: Brightness.dark,
     ),
   );
+
+  // Initialize local notifications
+  await NotificationService.initialize();
 
   runApp(const WanderlandApp());
 }

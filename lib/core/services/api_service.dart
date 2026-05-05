@@ -6,6 +6,12 @@ import 'package:tripgenie/core/config/network_config.dart';
 class ApiService {
   static String get baseUrl => NetworkConfig.baseUrl;
 
+  static String _buildUrl(String path, [Map<String, String>? queryParameters]) {
+    final uri =
+        Uri.parse('$baseUrl$path').replace(queryParameters: queryParameters);
+    return uri.toString();
+  }
+
   static const List<Map<String, dynamic>> _fallbackPlaces = [
     {
       'id': 'p1',
@@ -183,12 +189,14 @@ class ApiService {
     try {
       final response = await http
           .get(
-            Uri.parse('$baseUrl/places'),
+            Uri.parse(_buildUrl('/places')),
           )
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
+        print(
+            'ApiService.getPlaces: fetched ${decoded is List ? decoded.length : 0} places');
         if (decoded is List && decoded.isNotEmpty) {
           return decoded;
         }
@@ -197,6 +205,47 @@ class ApiService {
       }
     } catch (e) {
       print('API Error: $e');
+    }
+
+    return _fallbackPlaces;
+  }
+
+  static Future<List<dynamic>> getNearbyPlaces({
+    required double latitude,
+    required double longitude,
+    String? category,
+    int radius = 8000,
+    int limit = 150,
+  }) async {
+    try {
+      final queryParameters = <String, String>{
+        'latitude': latitude.toString(),
+        'longitude': longitude.toString(),
+        'radius': radius.toString(),
+        'limit': limit.toString(),
+      };
+      if (category != null && category.isNotEmpty && category != 'All') {
+        queryParameters['category'] = category;
+      }
+
+      final response = await http
+          .get(
+            Uri.parse(_buildUrl('/places/nearby', queryParameters)),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+        print(
+            'ApiService.getNearbyPlaces: fetched ${decoded is List ? decoded.length : 0} places');
+        if (decoded is List && decoded.isNotEmpty) {
+          return decoded;
+        }
+      } else {
+        print('Nearby places API error: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Nearby places API error: $e');
     }
 
     return _fallbackPlaces;

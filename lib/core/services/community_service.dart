@@ -10,9 +10,13 @@ class CommunityService {
   /// Get all community updates for a place
   static Future<List<CommunityUpdate>> getUpdates(String placeId) async {
     try {
-      final response = await http.get(
-        Uri.parse('$_baseUrl/places/$placeId/updates'),
-      ).timeout(const Duration(seconds: 10));
+      final encoded = Uri.encodeComponent(placeId);
+      print('CommunityService.getUpdates -> $_baseUrl/places/$encoded/updates');
+      final response = await http
+          .get(
+            Uri.parse('$_baseUrl/places/$encoded/updates'),
+          )
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
@@ -35,18 +39,22 @@ class CommunityService {
     required String updateType, // 'tip', 'warning', 'review'
   }) async {
     try {
-      final response = await http.post(
-        Uri.parse('$_baseUrl/places/$placeId/updates'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'place_id': placeId,
-          'user_id': userId,
-          'user_name': userName,
-          'user_initials': userInitials,
-          'text': text,
-          'type': updateType,
-        }),
-      ).timeout(const Duration(seconds: 10));
+      final encoded = Uri.encodeComponent(placeId);
+      print('CommunityService.postUpdate -> $_baseUrl/places/$encoded/updates');
+      final response = await http
+          .post(
+            Uri.parse('$_baseUrl/places/$encoded/updates'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'place_id': placeId,
+              'user_id': userId,
+              'user_name': userName,
+              'user_initials': userInitials,
+              'text': text,
+              'type': updateType,
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         return CommunityUpdate.fromJson(jsonDecode(response.body));
@@ -61,9 +69,14 @@ class CommunityService {
   /// Like or unlike an update
   static Future<bool> toggleLike(String placeId, String updateId) async {
     try {
-      final response = await http.post(
-        Uri.parse('$_baseUrl/places/$placeId/updates/$updateId/like'),
-      ).timeout(const Duration(seconds: 10));
+      final encoded = Uri.encodeComponent(placeId);
+      print(
+          'CommunityService.toggleLike -> $_baseUrl/places/$encoded/updates/$updateId/like');
+      final response = await http
+          .post(
+            Uri.parse('$_baseUrl/places/$encoded/updates/$updateId/like'),
+          )
+          .timeout(const Duration(seconds: 10));
 
       return response.statusCode == 200;
     } catch (e) {
@@ -75,9 +88,14 @@ class CommunityService {
   /// Delete a community update (own updates only)
   static Future<bool> deleteUpdate(String placeId, String updateId) async {
     try {
-      final response = await http.delete(
-        Uri.parse('$_baseUrl/places/$placeId/updates/$updateId'),
-      ).timeout(const Duration(seconds: 10));
+      final encoded = Uri.encodeComponent(placeId);
+      print(
+          'CommunityService.deleteUpdate -> $_baseUrl/places/$encoded/updates/$updateId');
+      final response = await http
+          .delete(
+            Uri.parse('$_baseUrl/places/$encoded/updates/$updateId'),
+          )
+          .timeout(const Duration(seconds: 10));
 
       return response.statusCode == 200;
     } catch (e) {

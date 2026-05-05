@@ -4,23 +4,23 @@ class AppColors {
   AppColors._();
 
   // Primary brand colors
-  static const Color primary = Color(0xFF1A73E8);
-  static const Color primaryDark = Color(0xFF0D47A1);
-  static const Color primaryLight = Color(0xFFE8F0FE);
+  static const Color primary = Color(0xFF124B8D);
+  static const Color primaryDark = Color(0xFF0A2D57);
+  static const Color primaryLight = Color(0xFFDCEAFF);
 
   // Accent
-  static const Color accent = Color(0xFF00C897);
-  static const Color accentDark = Color(0xFF00875F);
+  static const Color accent = Color(0xFF0FA3B1);
+  static const Color accentDark = Color(0xFF0A6F79);
 
   // Backgrounds
-  static const Color background = Color(0xFFF8F9FA);
+  static const Color background = Color(0xFFF4F7FB);
   static const Color surfaceLight = Color(0xFFFFFFFF);
-  static const Color surfaceDark = Color(0xFF1E1E2E);
+  static const Color surfaceDark = Color(0xFF121826);
 
   // Text
-  static const Color textPrimary = Color(0xFF1C1C1E);
-  static const Color textSecondary = Color(0xFF6B7280);
-  static const Color textHint = Color(0xFFADB5BD);
+  static const Color textPrimary = Color(0xFF0F172A);
+  static const Color textSecondary = Color(0xFF475569);
+  static const Color textHint = Color(0xFF94A3B8);
 
   // Crowd indicators
   static const Color crowdLow = Color(0xFF34D399);
@@ -39,12 +39,12 @@ class AppColors {
   static const Color darkSurface2 = Color(0xFF0F3460);
 
   // Border
-  static const Color border = Color(0xFFE5E7EB);
-  static const Color borderDark = Color(0xFF374151);
+  static const Color border = Color(0xFFD7E0EA);
+  static const Color borderDark = Color(0xFF334155);
 
   // Gradient
   static const List<Color> splashGradient = [
-    Color(0xFF1A73E8),
-    Color(0xFF00C897),
+    Color(0xFF124B8D),
+    Color(0xFF0FA3B1),
   ];
 }
