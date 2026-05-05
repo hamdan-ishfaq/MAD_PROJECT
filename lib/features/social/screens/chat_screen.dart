@@ -1,9 +1,16 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:tripgenie/core/config/network_config.dart';
 import 'package:tripgenie/core/constants/app_colors.dart';
 import 'package:tripgenie/core/services/auth_service.dart';
 import 'package:tripgenie/core/services/chat_persistence_service.dart';
 import 'package:tripgenie/core/services/chat_room_state_service.dart';
+import 'package:tripgenie/core/services/notification_service.dart';
+import 'package:tripgenie/core/services/websocket_service.dart';
 import 'package:tripgenie/features/social/models/trip_model.dart';
 
 //  ChatScreen    Phase 7
@@ -22,10 +29,14 @@ class _ChatScreenState extends State<ChatScreen> {
   final _msgController = TextEditingController();
   final _scrollController = ScrollController();
   List<ChatMessage> _messages = [];
-  bool _isSending = false;
   bool _isJoined = false;
+  bool _isRealtimeConnected = false;
+  String _currentUserId = 'guest';
   String _currentUserName = 'You';
   String _currentUserInitials = 'ME';
+  WebSocketService? _webSocketService;
+  StreamSubscription<ChatMessage>? _messageSubscription;
+  StreamSubscription<bool>? _connectionSubscription;
 
   @override
   void initState() {
@@ -38,6 +49,7 @@ class _ChatScreenState extends State<ChatScreen> {
     await _loadMessages();
     await ChatRoomStateService.joinRoom(widget.trip.id);
     await ChatRoomStateService.markRead(widget.trip.id);
+    await _connectRealtime();
     if (mounted) {
       setState(() {
         _isJoined = true;
@@ -47,6 +59,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _loadCurrentUser() async {
     final user = await AuthService.loadUser();
+    if (user != null) {
+      _currentUserId = user.id;
+    }
     if (mounted && user != null) {
       setState(() {
         _currentUserName =
@@ -59,24 +74,109 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _loadMessages() async {
-    final messages = await ChatPersistenceService.loadMessages(widget.trip.id);
+    final localMessages =
+        await ChatPersistenceService.loadMessages(widget.trip.id);
+    final remoteMessages = await _fetchRemoteHistory();
+    final merged = _mergeMessages([...localMessages, ...remoteMessages]);
 
-    // Dynamically recalculate isMe based on the current user
-    final updatedMessages = messages
-        .map((m) => ChatMessage(
-              id: m.id,
-              senderName: m.senderName,
-              senderInitials: m.senderInitials,
-              text: m.text,
-              timestamp: m.timestamp,
-              isMe: m.senderName == _currentUserName || m.senderName == 'You',
-            ))
-        .toList();
+    await ChatPersistenceService.saveMessages(widget.trip.id, merged);
 
+    if (!mounted) return;
     setState(() {
-      _messages = updatedMessages;
+      _messages = merged;
     });
     // Scroll to bottom after frame
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+  }
+
+  Future<List<ChatMessage>> _fetchRemoteHistory() async {
+    try {
+      final response = await http
+          .get(Uri.parse(
+              '${NetworkConfig.baseUrl}/chat/${widget.trip.id}/history'))
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode != 200) return const <ChatMessage>[];
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! List) return const <ChatMessage>[];
+
+      return decoded
+          .whereType<Map<String, dynamic>>()
+          .map(
+            (json) => ChatMessage(
+              id: json['id']?.toString() ??
+                  DateTime.now().millisecondsSinceEpoch.toString(),
+              senderName: json['user_name']?.toString() ?? 'Unknown',
+              senderInitials: json['user_initials']?.toString() ?? '??',
+              text: json['text']?.toString() ?? '',
+              timestamp:
+                  DateTime.tryParse(json['timestamp']?.toString() ?? '') ??
+                      DateTime.now(),
+              isMe: json['user_id']?.toString() == _currentUserId,
+            ),
+          )
+          .toList();
+    } catch (_) {
+      return const <ChatMessage>[];
+    }
+  }
+
+  List<ChatMessage> _mergeMessages(List<ChatMessage> messages) {
+    final merged = <String, ChatMessage>{};
+    for (final message in messages) {
+      merged[message.id] = message;
+    }
+    final result = merged.values.toList()
+      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    return result;
+  }
+
+  Future<void> _connectRealtime() async {
+    _webSocketService = WebSocketService(
+      tripId: widget.trip.id,
+      userId: _currentUserId,
+      userName: _currentUserName,
+      userInitials: _currentUserInitials,
+    );
+
+    _messageSubscription = _webSocketService!.messageStream.listen(
+      _handleIncomingRealtimeMessage,
+    );
+    _connectionSubscription = _webSocketService!.connectionStream.listen(
+      (connected) {
+        if (!mounted) return;
+        setState(() {
+          _isRealtimeConnected = connected;
+        });
+      },
+    );
+
+    await _webSocketService!.connect();
+  }
+
+  Future<void> _handleIncomingRealtimeMessage(ChatMessage message) async {
+    if (_messages.any((existing) => existing.id == message.id)) {
+      return;
+    }
+
+    final updated = _mergeMessages([..._messages, message]);
+    if (!mounted) return;
+
+    setState(() {
+      _messages = updated;
+    });
+    await ChatPersistenceService.saveMessages(widget.trip.id, updated);
+
+    if (!message.isMe && message.senderName != 'System') {
+      await NotificationService.showNotification(
+        id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
+        title: message.senderName,
+        body: message.text.length > 120
+            ? '${message.text.substring(0, 117)}...'
+            : message.text,
+      );
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
   }
 
@@ -94,8 +194,10 @@ class _ChatScreenState extends State<ChatScreen> {
     final text = _msgController.text.trim();
     if (text.isEmpty) return;
 
+    final messageId = DateTime.now().millisecondsSinceEpoch.toString();
+
     final newMessage = ChatMessage(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: messageId,
       senderName: _currentUserName,
       senderInitials: _currentUserInitials,
       text: text,
@@ -103,15 +205,15 @@ class _ChatScreenState extends State<ChatScreen> {
       isMe: true,
     );
 
+    final updated = _mergeMessages([..._messages, newMessage]);
     setState(() {
-      _messages.add(newMessage);
-      _isSending = false;
+      _messages = updated;
     });
 
-    // Save to persistent storage
-    ChatPersistenceService.saveMessages(widget.trip.id, _messages);
+    ChatPersistenceService.saveMessages(widget.trip.id, updated);
     ChatRoomStateService.joinRoom(widget.trip.id);
     ChatRoomStateService.markRead(widget.trip.id);
+    _webSocketService?.sendMessage(text, messageId: messageId);
 
     _msgController.clear();
     // Scroll after the new message renders
@@ -120,6 +222,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    _messageSubscription?.cancel();
+    _connectionSubscription?.cancel();
+    _webSocketService?.dispose();
     _msgController.dispose();
     _scrollController.dispose();
     super.dispose();

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:tripgenie/core/models/place_model.dart';
@@ -13,6 +14,11 @@ class OfflineDbService {
   static const int _dbVersion = 1;
   static final StreamController<void> _changesController =
       StreamController<void>.broadcast();
+  static final Map<String, Place> _webPlaces = {};
+  static final Map<String, SavedItinerary> _webItineraries = {};
+  static final Map<String, Map<String, String>> _webFavorites = {};
+  static final List<Map<String, dynamic>> _webSyncQueue = [];
+  static int _webSyncQueueId = 1;
 
   static Stream<void> get changes => _changesController.stream;
 
@@ -24,6 +30,9 @@ class OfflineDbService {
 
   /// Get (or create) the database singleton
   static Future<Database> get database async {
+    if (kIsWeb) {
+      throw UnsupportedError('SQLite is not available on web');
+    }
     if (_database != null) return _database!;
     _database = await _initDatabase();
     return _database!;
@@ -38,6 +47,30 @@ class OfflineDbService {
       version: _dbVersion,
       onCreate: _onCreate,
     );
+  }
+
+  static Future<String> databasePath() async {
+    if (kIsWeb) {
+      throw UnsupportedError('Database file path is not available on web');
+    }
+    final dir = await getApplicationDocumentsDirectory();
+    return '${dir.path}/$_dbName';
+  }
+
+  static Future<void> resetDatabaseHandle() async {
+    _database = null;
+  }
+
+  static Future<void> deleteDatabaseFile() async {
+    final path = await databasePath();
+    final existingDatabase = _database;
+    if (existingDatabase != null) {
+      await existingDatabase.close();
+    }
+    if (await databaseExists(path)) {
+      await deleteDatabase(path);
+    }
+    _database = null;
   }
 
   static Future<void> _onCreate(Database db, int version) async {
@@ -106,6 +139,13 @@ class OfflineDbService {
   // ─── Places Cache ───
 
   static Future<void> cachePlaces(List<Place> places) async {
+    if (kIsWeb) {
+      for (final place in places) {
+        _webPlaces[place.id] = place;
+      }
+      _notifyChanged();
+      return;
+    }
     final db = await database;
     final batch = db.batch();
 
@@ -136,6 +176,11 @@ class OfflineDbService {
   }
 
   static Future<List<Place>> getCachedPlaces({String? category}) async {
+    if (kIsWeb) {
+      return _webPlaces.values
+          .where((place) => category == null || place.category == category)
+          .toList();
+    }
     final db = await database;
     final List<Map<String, dynamic>> maps;
 
@@ -170,6 +215,9 @@ class OfflineDbService {
   }
 
   static Future<Place?> getCachedPlace(String id) async {
+    if (kIsWeb) {
+      return _webPlaces[id];
+    }
     final db = await database;
     final maps = await db.query('places', where: 'id = ?', whereArgs: [id]);
 
@@ -201,6 +249,11 @@ class OfflineDbService {
   // ─── Saved Itineraries ───
 
   static Future<void> saveItineraryLocally(SavedItinerary itinerary) async {
+    if (kIsWeb) {
+      _webItineraries[itinerary.id] = itinerary;
+      _notifyChanged();
+      return;
+    }
     final db = await database;
     await db.insert(
       'saved_itineraries',
@@ -223,6 +276,12 @@ class OfflineDbService {
   }
 
   static Future<List<SavedItinerary>> getLocalItineraries(String userId) async {
+    if (kIsWeb) {
+      return _webItineraries.values
+          .where((itinerary) => itinerary.userId == userId)
+          .toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    }
     final db = await database;
     final maps = await db.query(
       'saved_itineraries',
@@ -253,6 +312,11 @@ class OfflineDbService {
   }
 
   static Future<void> deleteLocalItinerary(String id) async {
+    if (kIsWeb) {
+      _webItineraries.remove(id);
+      _notifyChanged();
+      return;
+    }
     final db = await database;
     await db.delete('saved_itineraries', where: 'id = ?', whereArgs: [id]);
     _notifyChanged();
@@ -261,6 +325,11 @@ class OfflineDbService {
   // ─── Favorites ───
 
   static Future<void> addLocalFavorite(String userId, String placeId) async {
+    if (kIsWeb) {
+      _webFavorites.putIfAbsent(userId, () => {})[placeId] = placeId;
+      _notifyChanged();
+      return;
+    }
     final db = await database;
     await db.insert(
       'favorites',
@@ -275,6 +344,11 @@ class OfflineDbService {
   }
 
   static Future<void> removeLocalFavorite(String userId, String placeId) async {
+    if (kIsWeb) {
+      _webFavorites[userId]?.remove(placeId);
+      _notifyChanged();
+      return;
+    }
     final db = await database;
     await db.delete(
       'favorites',
@@ -285,6 +359,9 @@ class OfflineDbService {
   }
 
   static Future<List<String>> getLocalFavorites(String userId) async {
+    if (kIsWeb) {
+      return _webFavorites[userId]?.keys.toList() ?? <String>[];
+    }
     final db = await database;
     final maps =
         await db.query('favorites', where: 'user_id = ?', whereArgs: [userId]);
@@ -295,6 +372,17 @@ class OfflineDbService {
 
   static Future<void> addToSyncQueue(
       String operation, String tableName, Map<String, dynamic> data) async {
+    if (kIsWeb) {
+      _webSyncQueue.add({
+        'id': _webSyncQueueId++,
+        'operation': operation,
+        'table_name': tableName,
+        'data': jsonEncode(data),
+        'created_at': DateTime.now().toIso8601String(),
+        'synced': 0,
+      });
+      return;
+    }
     final db = await database;
     await db.insert('sync_queue', {
       'operation': operation,
@@ -306,12 +394,24 @@ class OfflineDbService {
   }
 
   static Future<List<Map<String, dynamic>>> getPendingSyncOps() async {
+    if (kIsWeb) {
+      return _webSyncQueue
+          .where((op) => op['synced'] == 0)
+          .toList(growable: false);
+    }
     final db = await database;
     return await db.query('sync_queue',
         where: 'synced = 0', orderBy: 'created_at ASC');
   }
 
   static Future<void> markSynced(int id) async {
+    if (kIsWeb) {
+      final index = _webSyncQueue.indexWhere((op) => op['id'] == id);
+      if (index != -1) {
+        _webSyncQueue[index]['synced'] = 1;
+      }
+      return;
+    }
     final db = await database;
     await db.update('sync_queue', {'synced': 1},
         where: 'id = ?', whereArgs: [id]);
@@ -320,11 +420,22 @@ class OfflineDbService {
   // ─── Utility ───
 
   static Future<void> clearCache() async {
+    if (kIsWeb) {
+      _webPlaces.clear();
+      return;
+    }
     final db = await database;
     await db.delete('places');
   }
 
   static Future<void> clearAll() async {
+    if (kIsWeb) {
+      _webPlaces.clear();
+      _webItineraries.clear();
+      _webFavorites.clear();
+      _webSyncQueue.clear();
+      return;
+    }
     final db = await database;
     await db.delete('places');
     await db.delete('saved_itineraries');

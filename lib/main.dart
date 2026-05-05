@@ -1,8 +1,11 @@
+import 'package:device_preview/device_preview.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:tripgenie/core/theme/app_theme.dart';
 import 'package:tripgenie/core/routes/app_routes.dart';
+import 'package:tripgenie/core/services/app_data_reset_service.dart';
 import 'package:tripgenie/core/services/notification_service.dart';
 
 void main() async {
@@ -26,9 +29,17 @@ void main() async {
   );
 
   // Initialize local notifications
+  if (!kIsWeb) {
+    await AppDataResetService.purgeLocalStateIfRequested();
+  }
   await NotificationService.initialize();
 
-  runApp(const WanderlandApp());
+  runApp(
+    DevicePreview(
+      enabled: !kReleaseMode,
+      builder: (context) => const WanderlandApp(),
+    ),
+  );
 }
 
 class WanderlandApp extends StatelessWidget {
@@ -37,6 +48,9 @@ class WanderlandApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
+      useInheritedMediaQuery: true,
+      locale: DevicePreview.locale(context),
+      builder: DevicePreview.appBuilder,
       title: 'Wanderland',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,

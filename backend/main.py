@@ -456,8 +456,8 @@ async def websocket_chat(websocket: WebSocket, trip_id: str, user_id: str = "", 
                 continue
 
             if msg_type == "message":
-                # Add server-generated ID and timestamp
-                payload["id"] = str(uuid.uuid4())
+                # Preserve the client message ID when present so the sender can dedupe echoed messages.
+                payload["id"] = payload.get("id") or str(uuid.uuid4())
                 payload["timestamp"] = datetime.utcnow().isoformat()
                 # Store message
                 if trip_id not in messages_db:
@@ -643,3 +643,22 @@ async def get_trips_history(user_id: str):
 @app.get("/health")
 def health_check():
     return {"status": "ok", "service": "TripGenie Backend", "version": "2.0", "phases": "7-12"}
+
+
+@app.post("/debug/reset-state")
+def reset_state():
+    """Reset in-memory backend state for local development."""
+    users_db.clear()
+    users_db["demo@example.com"] = {
+        "id": "user_1",
+        "name": "Demo User",
+        "email": "demo@example.com",
+        "password_hash": hashlib.sha256("password123".encode()).hexdigest(),
+    }
+    messages_db.clear()
+    community_updates_db.clear()
+    favorites_db.clear()
+    user_stats_db.clear()
+    saved_itineraries_db.clear()
+    manager.active_connections.clear()
+    return {"success": True, "message": "Backend state reset"}

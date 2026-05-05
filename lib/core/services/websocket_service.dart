@@ -15,6 +15,7 @@ class WebSocketService {
   final String userInitials;
 
   bool _isConnected = false;
+  bool _isDisposed = false;
   Timer? _pingTimer;
   Timer? _reconnectTimer;
   int _reconnectAttempts = 0;
@@ -45,14 +46,15 @@ class WebSocketService {
     required this.userName,
     required this.userInitials,
     String? baseUrl,
-  }) : _baseUrl = baseUrl ?? NetworkConfig.wsUrl;
+  }) : _baseUrl = baseUrl ?? NetworkConfig.websocketBaseUrl;
 
   /// Connect to the WebSocket server for the given trip chat room
   Future<void> connect() async {
     if (_isConnected) return;
 
     try {
-      final uri = Uri.parse('$_baseUrl/ws/chat/$tripId?user_id=$userId&user_name=$userName');
+      final uri = Uri.parse(
+          '$_baseUrl/ws/chat/$tripId?user_id=$userId&user_name=$userName');
       _channel = WebSocketChannel.connect(uri);
 
       // Listen for incoming messages
@@ -73,17 +75,20 @@ class WebSocketService {
     } catch (e) {
       print('[WebSocket] Connection error: $e');
       _isConnected = false;
-      _connectionController.add(false);
+      if (!_connectionController.isClosed) {
+        _connectionController.add(false);
+      }
       _scheduleReconnect();
     }
   }
 
   /// Send a text message
-  void sendMessage(String text) {
+  void sendMessage(String text, {String? messageId}) {
     if (!_isConnected || _channel == null) return;
 
     final payload = jsonEncode({
       'type': 'message',
+      'id': messageId ?? DateTime.now().millisecondsSinceEpoch.toString(),
       'user_id': userId,
       'user_name': userName,
       'user_initials': userInitials,
@@ -113,12 +118,15 @@ class WebSocketService {
     _reconnectTimer?.cancel();
     _channel?.sink.close();
     _isConnected = false;
-    _connectionController.add(false);
+    if (!_connectionController.isClosed) {
+      _connectionController.add(false);
+    }
     print('[WebSocket] Disconnected from trip $tripId');
   }
 
   /// Dispose all resources
   void dispose() {
+    _isDisposed = true;
     disconnect();
     _messageController.close();
     _connectionController.close();
@@ -139,7 +147,8 @@ class WebSocketService {
             senderName: data['user_name'] ?? 'Unknown',
             senderInitials: data['user_initials'] ?? '??',
             text: data['text'] ?? '',
-            timestamp: DateTime.tryParse(data['timestamp'] ?? '') ?? DateTime.now(),
+            timestamp:
+                DateTime.tryParse(data['timestamp'] ?? '') ?? DateTime.now(),
             isMe: data['user_id'] == userId,
           );
           _messageController.add(message);
@@ -187,14 +196,18 @@ class WebSocketService {
   void _handleError(dynamic error) {
     print('[WebSocket] Error: $error');
     _isConnected = false;
-    _connectionController.add(false);
+    if (!_connectionController.isClosed) {
+      _connectionController.add(false);
+    }
     _scheduleReconnect();
   }
 
   void _handleDone() {
     print('[WebSocket] Connection closed');
     _isConnected = false;
-    _connectionController.add(false);
+    if (!_connectionController.isClosed) {
+      _connectionController.add(false);
+    }
     _scheduleReconnect();
   }
 
@@ -208,16 +221,21 @@ class WebSocketService {
   }
 
   void _scheduleReconnect() {
+    if (_isDisposed) return;
     if (_reconnectAttempts >= _maxReconnectAttempts) {
       print('[WebSocket] Max reconnect attempts reached');
       return;
     }
 
     _reconnectTimer?.cancel();
-    final delay = Duration(seconds: (_reconnectAttempts + 1) * 2); // Exponential backoff
+    final delay =
+        Duration(seconds: (_reconnectAttempts + 1) * 2); // Exponential backoff
     _reconnectAttempts++;
 
-    print('[WebSocket] Scheduling reconnect attempt $_reconnectAttempts in ${delay.inSeconds}s');
-    _reconnectTimer = Timer(delay, () => connect());
+    print(
+        '[WebSocket] Scheduling reconnect attempt $_reconnectAttempts in ${delay.inSeconds}s');
+    _reconnectTimer = Timer(delay, () {
+      connect();
+    });
   }
 }

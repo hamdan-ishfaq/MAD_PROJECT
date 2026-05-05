@@ -1,5 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:tripgenie/core/constants/app_colors.dart';
+import 'package:tripgenie/core/config/network_config.dart';
 import 'package:tripgenie/core/services/chat_persistence_service.dart';
 import 'package:tripgenie/core/services/chat_room_state_service.dart';
 import 'package:tripgenie/core/services/api_service.dart';
@@ -35,24 +39,25 @@ class _TravelersScreenState extends State<TravelersScreen> {
   }
 
   Future<void> _loadTrips() async {
-    final places = await ApiService.getPlaces();
+    final remoteTrips = await ApiService.getTrips();
     if (!mounted) return;
     setState(() {
-      _allTrips = places
+      _allTrips = remoteTrips
           .map<TripPost>(
             (p) => TripPost(
               id: p['id']?.toString() ?? 'unknown',
-              destination: p['name'] ?? 'Unknown Place',
-              startDate: 'Ongoing',
-              endDate: 'Community',
-              groupSize: 100,
-              currentMembers: ((p['rating'] ?? 4.0) * 10).toInt(),
-              interests: [p['category'] ?? 'General'],
-              description:
-                  'Join the community chat for ${p['name']}! Share your experiences, ask questions, and meet fellow travelers.',
-              userName: 'WanderLand Community',
-              userInitials: 'WC',
-              postedAgo: 'Always Active',
+              destination: p['destination'] ?? 'Unknown Place',
+              startDate: p['start_date'] ?? 'TBD',
+              endDate: p['end_date'] ?? 'TBD',
+              groupSize: p['group_size'] ?? 4,
+              currentMembers: p['current_members'] ?? 1,
+              interests: (p['interests'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
+              description: p['description'] ?? '',
+              userName: p['user_name'] ?? 'User',
+              userInitials: p['user_name'] != null && p['user_name'].toString().length >= 2 
+                  ? p['user_name'].toString().substring(0, 2).toUpperCase() 
+                  : 'U',
+              postedAgo: p['posted_ago'] ?? 'Just now',
             ),
           )
           .toList();
@@ -75,10 +80,52 @@ class _TravelersScreenState extends State<TravelersScreen> {
   }
 
   Future<_TripChatState> _loadTripChatState(String tripId) async {
-    final messages = await ChatPersistenceService.loadMessages(tripId);
+    final messages = await _loadTripMessages(tripId);
     final joined = await ChatRoomStateService.isJoined(tripId);
     final unread = await ChatRoomStateService.unreadCount(tripId, messages);
     return _TripChatState(isJoined: joined, unreadCount: unread);
+  }
+
+  Future<List<ChatMessage>> _loadTripMessages(String tripId) async {
+    final localMessages = await ChatPersistenceService.loadMessages(tripId);
+    final remoteMessages = await _fetchRemoteMessages(tripId);
+    final merged = <String, ChatMessage>{};
+    for (final message in [...localMessages, ...remoteMessages]) {
+      merged[message.id] = message;
+    }
+    return merged.values.toList()
+      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+  }
+
+  Future<List<ChatMessage>> _fetchRemoteMessages(String tripId) async {
+    try {
+      final response = await http
+          .get(Uri.parse('${NetworkConfig.baseUrl}/chat/$tripId/history'))
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode != 200) return const <ChatMessage>[];
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! List) return const <ChatMessage>[];
+
+      return decoded
+          .whereType<Map<String, dynamic>>()
+          .map(
+            (json) => ChatMessage(
+              id: json['id']?.toString() ??
+                  DateTime.now().millisecondsSinceEpoch.toString(),
+              senderName: json['user_name']?.toString() ?? 'Unknown',
+              senderInitials: json['user_initials']?.toString() ?? '??',
+              text: json['text']?.toString() ?? '',
+              timestamp:
+                  DateTime.tryParse(json['timestamp']?.toString() ?? '') ??
+                      DateTime.now(),
+              isMe: false,
+            ),
+          )
+          .toList();
+    } catch (_) {
+      return const <ChatMessage>[];
+    }
   }
 
   @override
@@ -238,9 +285,21 @@ class _TripCardState extends State<_TripCard> {
       }
     }
 
-    Navigator.of(context).push(
+    await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => ChatScreen(trip: widget.trip)),
     );
+    
+    // Refresh state when coming back
+    final joined = await ChatRoomStateService.isJoined(widget.trip.id);
+    final localMessages = await ChatPersistenceService.loadMessages(widget.trip.id);
+    final unread = await ChatRoomStateService.unreadCount(widget.trip.id, localMessages);
+    
+    if (mounted) {
+      setState(() {
+        _joined = joined;
+        _unread = unread;
+      });
+    }
   }
 
   @override
@@ -471,13 +530,7 @@ class _TripCardState extends State<_TripCard> {
                   child: ElevatedButton.icon(
                     onPressed: widget.trip.isFull
                         ? null
-                        : () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => ChatScreen(trip: widget.trip),
-                              ),
-                            );
-                          },
+                        : () => _onJoinTap(context),
                     icon: Icon(
                       joined
                           ? Icons.mark_chat_unread_rounded

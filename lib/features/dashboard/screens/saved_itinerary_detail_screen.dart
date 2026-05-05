@@ -143,8 +143,10 @@ class _SavedItineraryWeather extends StatelessWidget {
 
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
     final daily = decoded['daily'] as Map<String, dynamic>?;
-    final maxTemp = _firstNumber(daily?['temperature_2m_max'] as List<dynamic>?);
-    final minTemp = _firstNumber(daily?['temperature_2m_min'] as List<dynamic>?);
+    final maxTemp =
+        _firstNumber(daily?['temperature_2m_max'] as List<dynamic>?);
+    final minTemp =
+        _firstNumber(daily?['temperature_2m_min'] as List<dynamic>?);
     final weatherCode = _firstNumber(daily?['weather_code'] as List<dynamic>?);
 
     final description = switch (weatherCode?.toInt()) {

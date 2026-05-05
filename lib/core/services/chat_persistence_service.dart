@@ -37,7 +37,7 @@ class ChatPersistenceService {
       final jsonString = prefs.getString('$_messagesKeyPrefix$tripId');
 
       if (jsonString == null || jsonString.isEmpty) {
-        return TripRepository.getSampleChat(tripId);
+        return <ChatMessage>[];
       }
 
       final List<dynamic> jsonList = jsonDecode(jsonString);
@@ -53,7 +53,7 @@ class ChatPersistenceService {
           .toList();
     } catch (e) {
       print('Error loading messages: $e');
-      return TripRepository.getSampleChat(tripId);
+      return <ChatMessage>[];
     }
   }
 

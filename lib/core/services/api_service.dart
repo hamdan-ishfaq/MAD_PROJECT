@@ -250,4 +250,45 @@ class ApiService {
 
     return _fallbackPlaces;
   }
+
+  static Future<List<dynamic>> getTrips({String destination = ''}) async {
+    try {
+      final queryParameters = <String, String>{};
+      if (destination.isNotEmpty) {
+        queryParameters['destination'] = destination;
+      }
+      final response = await http
+          .get(Uri.parse(_buildUrl('/trips', queryParameters.isEmpty ? null : queryParameters)))
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+        if (decoded is List) {
+          return decoded;
+        }
+      }
+    } catch (e) {
+      print('getTrips API Error: $e');
+    }
+    return [];
+  }
+
+  static Future<Map<String, dynamic>?> postTrip(Map<String, dynamic> tripData) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse(_buildUrl('/trips')),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode(tripData),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return json.decode(response.body) as Map<String, dynamic>;
+      }
+    } catch (e) {
+      print('postTrip API Error: $e');
+    }
+    return null;
+  }
 }

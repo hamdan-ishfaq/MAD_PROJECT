@@ -12,11 +12,7 @@ class NetworkConfig {
   static String get baseUrl {
     final configuredBaseUrl = dotenv.env['API_BASE_URL'];
     if (configuredBaseUrl != null && configuredBaseUrl.isNotEmpty) {
-      if (Platform.isAndroid && _isLocalhostLike(configuredBaseUrl)) {
-        // Ignore localhost-style URLs on physical Android devices.
-      } else {
-        return configuredBaseUrl;
-      }
+      return configuredBaseUrl;
     }
 
     // Default to the deployed Render URL when no env var is configured.
@@ -25,20 +21,11 @@ class NetworkConfig {
     return defaultRenderUrl;
   }
 
-  static bool _isLocalhostLike(String url) {
-    final value = url.toLowerCase();
-    return value.contains('localhost') ||
-        value.contains('127.0.0.1') ||
-        value.contains('0.0.0.0');
-  }
-
   /// Candidate backend URLs to try when the configured host is stale.
   static List<String> get candidateBaseUrls {
     final configuredBaseUrl = dotenv.env['API_BASE_URL'];
     List<String> urls = [];
-    if (configuredBaseUrl != null &&
-        configuredBaseUrl.isNotEmpty &&
-        !(Platform.isAndroid && _isLocalhostLike(configuredBaseUrl))) {
+    if (configuredBaseUrl != null && configuredBaseUrl.isNotEmpty) {
       urls.add(configuredBaseUrl);
     }
 
@@ -59,13 +46,13 @@ class NetworkConfig {
     return urls.toSet().toList();
   }
 
-  /// WebSocket URL for real-time features
-  static String get wsUrl {
+  /// WebSocket origin for real-time features.
+  static String get websocketBaseUrl {
     final base = baseUrl;
     final scheme = base.toLowerCase().startsWith('https') ? 'wss' : 'ws';
     final host = base
         .replaceAll(RegExp(r'^https?://'), '')
         .replaceAll(RegExp(r'/$'), '');
-    return '$scheme://$host/ws';
+    return '$scheme://$host';
   }
 }
