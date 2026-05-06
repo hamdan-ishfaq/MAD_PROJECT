@@ -9,6 +9,8 @@ import 'package:tripgenie/core/services/api_service.dart'; // Added API Service
 import 'package:tripgenie/core/services/dashboard_service.dart';
 import 'package:tripgenie/core/services/offline_db_service.dart';
 import 'package:tripgenie/features/social/widgets/community_updates_sheet.dart';
+import 'package:tripgenie/core/services/ai_service.dart';
+import 'package:tripgenie/core/services/places_service.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -41,13 +43,14 @@ class _MapScreenState extends State<MapScreen> {
     if (value.isEmpty) return 'Culture';
 
     // Direct matches for backend normalized categories
-    if (value == 'hotels' || value == 'hotel' || value == 'accommodations')
+    if (value == 'hotels' || value == 'hotel' || value == 'accommodations' || value == 'accommodation')
       return 'Hotels';
     if (value == 'parks' ||
         value == 'park' ||
         value == 'natural' ||
         value == 'garden' ||
-        value == 'trail') return 'Parks';
+        value == 'trail' ||
+        value == 'urban_environment') return 'Parks';
     if (value == 'food' ||
         value == 'foods' ||
         value == 'restaurant' ||
@@ -63,23 +66,36 @@ class _MapScreenState extends State<MapScreen> {
         value == 'shops' ||
         value == 'mall' ||
         value == 'market') return 'Shopping';
+    if (value == 'cultural' ||
+        value == 'historic' ||
+        value == 'religion' ||
+        value == 'architecture' ||
+        value == 'museum' ||
+        value == 'interesting_places') return 'Culture';
 
     // Substring checks for broader matching
-    if (value.contains('hotel') || value.contains('lodging')) return 'Hotels';
+    if (value.contains('hotel') || value.contains('lodging') || value.contains('accomm') || value.contains('hostel')) return 'Hotels';
     if (value.contains('park') ||
         value.contains('garden') ||
         value.contains('trail') ||
-        value.contains('natural')) return 'Parks';
+        value.contains('natural') ||
+        value.contains('beach') ||
+        value.contains('lake') ||
+        value.contains('mountain') ||
+        value.contains('forest')) return 'Parks';
     if (value.contains('food') ||
         value.contains('restaurant') ||
         value.contains('cafe') ||
         value.contains('bar') ||
         value.contains('bakery') ||
-        value.contains('fast')) return 'Food';
+        value.contains('fast') ||
+        value.contains('eat') ||
+        value.contains('cuisine')) return 'Food';
     if (value.contains('shop') ||
         value.contains('mall') ||
         value.contains('market') ||
-        value.contains('store')) return 'Shopping';
+        value.contains('store') ||
+        value.contains('boutique')) return 'Shopping';
 
     return 'Culture';
   }
@@ -263,10 +279,47 @@ class _MapScreenState extends State<MapScreen> {
                           style: const TextStyle(fontWeight: FontWeight.bold)),
                     ],
                   ),
-                  const SizedBox(height: 8),
                   const Text(
                       "A top-rated spot in the city. Tap below to see user reviews and AI insights.",
                       style: TextStyle(color: Colors.grey, height: 1.5)),
+                  const SizedBox(height: 16),
+                  FutureBuilder<Map<String, String>>(
+                    future: () async {
+                      final details = await PlacesService.getPlaceDetails(place['id']?.toString() ?? '');
+                      String summary = "Top destination for travelers exploring ${place['type']}.";
+                      if (details != null && details.description.isNotEmpty) {
+                        summary = await AIService.summarizeAttraction(place['name'], details.description);
+                      }
+                      final bestTime = await AIService.getBestTimeToVisit(place['name'], place['type']);
+                      return {'summary': summary, 'bestTime': bestTime};
+                    }(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: Padding(padding: EdgeInsets.all(8.0), child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))));
+                      }
+                      final data = snapshot.data ?? {'summary': '', 'bestTime': ''};
+                      return Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.primary.withValues(alpha: 0.1)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(children: [Icon(Icons.auto_awesome, size: 14, color: AppColors.primary), SizedBox(width: 6), Text("AI Insights", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.primary))]),
+                            const SizedBox(height: 6),
+                            if (data['bestTime']!.isNotEmpty) ...[
+                              Text(data['bestTime']!, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.accent)),
+                              const SizedBox(height: 8),
+                            ],
+                            Text(data['summary']!, style: const TextStyle(fontSize: 12, height: 1.4)),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
                   const SizedBox(height: 16),
                   SizedBox(
                     width: double.infinity,

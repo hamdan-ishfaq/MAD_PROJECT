@@ -1,30 +1,14 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:tripgenie/features/social/models/community_update_model.dart';
-import 'package:tripgenie/core/config/network_config.dart';
+import 'package:tripgenie/core/services/local_backend_service.dart';
 
 /// Service for community updates – tips, warnings, and reviews per place.
+/// Now uses local SQLite backend instead of HTTP calls.
 class CommunityService {
-  static String get _baseUrl => NetworkConfig.baseUrl;
-
   /// Get all community updates for a place
   static Future<List<CommunityUpdate>> getUpdates(String placeId) async {
     try {
-      final encoded = Uri.encodeComponent(placeId);
-      print('CommunityService.getUpdates -> $_baseUrl/places/$encoded/updates');
-      final response = await http
-          .get(
-            Uri.parse('$_baseUrl/places/$encoded/updates'),
-          )
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
-        return data.map((json) => CommunityUpdate.fromJson(json)).toList();
-      }
-      return [];
+      return await LocalBackendService.getCommunityUpdates(placeId);
     } catch (e) {
-      print('Error fetching community updates: $e');
       return [];
     }
   }
@@ -39,29 +23,15 @@ class CommunityService {
     required String updateType, // 'tip', 'warning', 'review'
   }) async {
     try {
-      final encoded = Uri.encodeComponent(placeId);
-      print('CommunityService.postUpdate -> $_baseUrl/places/$encoded/updates');
-      final response = await http
-          .post(
-            Uri.parse('$_baseUrl/places/$encoded/updates'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'place_id': placeId,
-              'user_id': userId,
-              'user_name': userName,
-              'user_initials': userInitials,
-              'text': text,
-              'type': updateType,
-            }),
-          )
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return CommunityUpdate.fromJson(jsonDecode(response.body));
-      }
-      return null;
+      return await LocalBackendService.postCommunityUpdate(
+        placeId: placeId,
+        userId: userId,
+        userName: userName,
+        userInitials: userInitials,
+        text: text,
+        updateType: updateType,
+      );
     } catch (e) {
-      print('Error posting community update: $e');
       return null;
     }
   }
@@ -69,18 +39,8 @@ class CommunityService {
   /// Like or unlike an update
   static Future<bool> toggleLike(String placeId, String updateId) async {
     try {
-      final encoded = Uri.encodeComponent(placeId);
-      print(
-          'CommunityService.toggleLike -> $_baseUrl/places/$encoded/updates/$updateId/like');
-      final response = await http
-          .post(
-            Uri.parse('$_baseUrl/places/$encoded/updates/$updateId/like'),
-          )
-          .timeout(const Duration(seconds: 10));
-
-      return response.statusCode == 200;
+      return await LocalBackendService.toggleLike(placeId, updateId);
     } catch (e) {
-      print('Error toggling like: $e');
       return false;
     }
   }
@@ -88,18 +48,9 @@ class CommunityService {
   /// Delete a community update (own updates only)
   static Future<bool> deleteUpdate(String placeId, String updateId) async {
     try {
-      final encoded = Uri.encodeComponent(placeId);
-      print(
-          'CommunityService.deleteUpdate -> $_baseUrl/places/$encoded/updates/$updateId');
-      final response = await http
-          .delete(
-            Uri.parse('$_baseUrl/places/$encoded/updates/$updateId'),
-          )
-          .timeout(const Duration(seconds: 10));
-
-      return response.statusCode == 200;
+      return await LocalBackendService.deleteCommunityUpdate(
+          placeId, updateId);
     } catch (e) {
-      print('Error deleting update: $e');
       return false;
     }
   }

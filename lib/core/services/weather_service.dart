@@ -1,7 +1,8 @@
 import 'dart:convert';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
-// WeatherService
+// WeatherService — reads API key from .env
 
 class WeatherData {
   final String condition;   // "Clear", "Clouds", "Rain" etc.
@@ -39,14 +40,15 @@ class WeatherData {
 }
 
 class WeatherService {
-  static const String _apiKey = 'YOUR_API_KEY';
-  static const String _base   = 'https://api.openweathermap.org/data/2.5';
+  // Read from .env instead of hardcoding
+  static String get _apiKey => dotenv.env['WEATHER_API_KEY'] ?? '';
+  static const String _base = 'https://api.openweathermap.org/data/2.5';
 
-  /// Fetch a simple current-weather snapshot
+  /// Fetch a simple current-weather snapshot.
   /// Returns null if the city is not found or the network fails.
   static Future<WeatherData?> getWeather(String city) async {
-    if (_apiKey == 'dd1f3fe8d9a0626b97c14c1bda99c6c7') {
-      // Return dummy data so the UI still looks good while you set up the key
+    // Return dummy data when no API key is configured
+    if (_apiKey.isEmpty || _apiKey == 'YOUR_API_KEY') {
       return WeatherData(
         condition:   'Sunny',
         description: 'clear sky',
@@ -66,15 +68,16 @@ class WeatherService {
       if (res.statusCode == 200) {
         return WeatherData.fromJson(json.decode(res.body));
       }
-    } catch (e) {
-      print('WeatherService error: $e');
+    } catch (_) {
+      // Network error — return null silently
     }
     return null;
   }
 
   static String emojiFor(String condition) {
     switch (condition.toLowerCase()) {
-      case 'clear':        return '☀️';
+      case 'clear':
+      case 'sunny':       return '☀️';
       case 'clouds':       return '☁️';
       case 'rain':
       case 'drizzle':      return '🌧️';

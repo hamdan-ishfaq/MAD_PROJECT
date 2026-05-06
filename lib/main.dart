@@ -1,4 +1,3 @@
-import 'package:device_preview/device_preview.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -28,18 +27,15 @@ void main() async {
     ),
   );
 
-  // Initialize local notifications
+  // Purge local state if requested (development aid)
   if (!kIsWeb) {
     await AppDataResetService.purgeLocalStateIfRequested();
   }
+
+  // Initialize local notifications
   await NotificationService.initialize();
 
-  runApp(
-    DevicePreview(
-      enabled: !kReleaseMode,
-      builder: (context) => const WanderlandApp(),
-    ),
-  );
+  runApp(const WanderlandApp());
 }
 
 class WanderlandApp extends StatelessWidget {
@@ -48,9 +44,6 @@ class WanderlandApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      useInheritedMediaQuery: true,
-      locale: DevicePreview.locale(context),
-      builder: DevicePreview.appBuilder,
       title: 'Wanderland',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,

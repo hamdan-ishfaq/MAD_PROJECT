@@ -6,6 +6,9 @@ import 'package:tripgenie/features/social/models/trip_model.dart';
 import 'package:tripgenie/features/social/screens/chat_screen.dart';
 import 'package:tripgenie/features/social/models/community_update_model.dart';
 import 'package:tripgenie/features/social/widgets/update_card.dart';
+import 'package:tripgenie/core/services/ai_service.dart';
+import 'package:tripgenie/core/services/places_service.dart';
+import 'package:tripgenie/core/models/place_model.dart';
 
 /// Bottom sheet that shows community tips, warnings, and reviews for a place.
 class CommunityUpdatesSheet extends StatefulWidget {
@@ -37,6 +40,9 @@ class CommunityUpdatesSheet extends StatefulWidget {
 
 class _CommunityUpdatesSheetState extends State<CommunityUpdatesSheet> {
   late Future<List<CommunityUpdate>> _updatesFuture;
+  late Future<String?> _aiSummaryFuture;
+  String? _crowdForecast;
+  bool _isForecasting = false;
   final _textController = TextEditingController();
   String _selectedType = 'tip';
 
@@ -44,6 +50,38 @@ class _CommunityUpdatesSheetState extends State<CommunityUpdatesSheet> {
   void initState() {
     super.initState();
     _updatesFuture = CommunityService.getUpdates(widget.placeId);
+    _aiSummaryFuture = _fetchAISummary();
+  }
+
+  Future<String?> _fetchAISummary() async {
+    try {
+      final place = await PlacesService.getPlaceDetails(widget.placeId);
+      if (place != null && place.description.isNotEmpty) {
+        return await AIService.summarizeAttraction(widget.placeName, place.description);
+      }
+    } catch (e) {
+      return null;
+    }
+    return null;
+  }
+
+  Future<void> _getForecast() async {
+    setState(() => _isForecasting = true);
+    try {
+      final forecast = await AIService.predictCrowdLevel(
+        placeName: widget.placeName,
+        category: "Attraction", // Could be more specific if available
+        time: DateTime.now(),
+      );
+      if (mounted) {
+        setState(() {
+          _crowdForecast = forecast;
+          _isForecasting = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isForecasting = false);
+    }
   }
 
   void _refresh() {
@@ -141,6 +179,11 @@ class _CommunityUpdatesSheetState extends State<CommunityUpdatesSheet> {
                     ],
                   ),
                 ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: _buildAIInsights(),
+                ),
+                const SizedBox(height: 8),
                 const Divider(height: 1, color: AppColors.border),
                 Expanded(
                   child: FutureBuilder<List<CommunityUpdate>>(
@@ -263,6 +306,94 @@ class _CommunityUpdatesSheetState extends State<CommunityUpdatesSheet> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildAIInsights() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        FutureBuilder<String?>(
+          future: _aiSummaryFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Container(
+                height: 60,
+                width: double.infinity,
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.border)),
+                child: const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))),
+              );
+            }
+            if (!snapshot.hasData || snapshot.data == null) return const SizedBox();
+
+            return Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(colors: [AppColors.primary.withValues(alpha: 0.05), Colors.white], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    const Icon(Icons.auto_awesome, size: 16, color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    const Text('AI Insights', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary, fontSize: 13)),
+                  ]),
+                  const SizedBox(height: 8),
+                  Text(snapshot.data!, style: const TextStyle(fontSize: 12, height: 1.5, color: AppColors.textPrimary)),
+                ],
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        InkWell(
+          onTap: _isForecasting ? null : _getForecast,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.analytics_outlined, size: 18, color: AppColors.accent),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('AI Crowd Forecast', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                      if (_crowdForecast != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(_crowdForecast!, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                        )
+                      else if (_isForecasting)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 4),
+                          child: Text('Calculating peak hours...', style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic)),
+                        )
+                      else
+                        const Padding(
+                          padding: EdgeInsets.only(top: 2),
+                          child: Text('Tap to predict busy hours', style: TextStyle(fontSize: 11, color: AppColors.textHint)),
+                        ),
+                    ],
+                  ),
+                ),
+                if (_isForecasting)
+                  const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                else if (_crowdForecast == null)
+                  const Icon(Icons.chevron_right, size: 16, color: AppColors.textHint),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

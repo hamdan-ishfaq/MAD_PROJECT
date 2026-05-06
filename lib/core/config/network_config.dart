@@ -1,27 +1,18 @@
-import 'dart:io';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class NetworkConfig {
-  /// Base URL for the backend API.
-  ///
-  /// FOR EMULATOR: Use 'http://10.0.2.2:8080'
-  /// FOR PHYSICAL DEVICE: Use your PC's IP, e.g., 'http://192.168.1.XX:8080'
-  ///
-  /// TIP: Check your IP by running 'ipconfig' (Windows) or 'ifconfig' (Mac/Linux)
+  /// Base URL for external API calls only (e.g., if we ever use a deployed backend).
+  /// Most features now use LocalBackendService (SQLite) and don't need this.
   static String get baseUrl {
     final configuredBaseUrl = dotenv.env['API_BASE_URL'];
     if (configuredBaseUrl != null && configuredBaseUrl.isNotEmpty) {
       return configuredBaseUrl;
     }
-
-    // Default to the deployed Render URL when no env var is configured.
-    // Make sure there is NO trailing slash on this value.
-    const defaultRenderUrl = 'https://wanderland-api-pbys.onrender.com';
-    return defaultRenderUrl;
+    return 'http://localhost:8080';
   }
 
-  /// Candidate backend URLs to try when the configured host is stale.
+  /// Candidate backend URLs (used only for external API fallback).
   static List<String> get candidateBaseUrls {
     final configuredBaseUrl = dotenv.env['API_BASE_URL'];
     List<String> urls = [];
@@ -29,12 +20,9 @@ class NetworkConfig {
       urls.add(configuredBaseUrl);
     }
 
-    // Prefer the deployed Render URL first, then fall back to local hosts for
-    // development/emulators.
-    urls.add('https://wanderland-api-pbys.onrender.com');
-    if (Platform.isAndroid) {
+    if (!kIsWeb) {
+      // On mobile devices add common local addresses
       urls.addAll([
-        'http://10.7.104.19:8080',
         'http://10.0.2.2:8080',
         'http://localhost:8080',
       ]);
@@ -46,7 +34,7 @@ class NetworkConfig {
     return urls.toSet().toList();
   }
 
-  /// WebSocket origin for real-time features.
+  /// WebSocket origin (legacy — no longer used with local backend).
   static String get websocketBaseUrl {
     final base = baseUrl;
     final scheme = base.toLowerCase().startsWith('https') ? 'wss' : 'ws';

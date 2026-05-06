@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:tripgenie/core/constants/app_colors.dart';
+import 'package:tripgenie/core/services/auth_service.dart';
 import 'package:tripgenie/features/social/models/trip_model.dart';
 import 'package:tripgenie/core/services/api_service.dart';
 
@@ -89,7 +90,15 @@ class _PostTripScreenState extends State<PostTripScreen> {
     }
 
     setState(() => _isPosting = true);
-    await Future.delayed(const Duration(milliseconds: 800)); // simulate
+
+    // Load actual user data
+    final user = await AuthService.loadUser();
+    final userName = user?.name.isNotEmpty == true
+        ? user!.name
+        : (user?.email.split('@')[0] ?? 'Explorer');
+    final userInitials = userName.length >= 2
+        ? userName.substring(0, 2).toUpperCase()
+        : userName.toUpperCase();
 
     final posted = await ApiService.postTrip({
       'destination': _destController.text.trim(),
@@ -98,26 +107,14 @@ class _PostTripScreenState extends State<PostTripScreen> {
       'group_size': _groupSize,
       'interests': _selectedInterests.isEmpty ? ['Travel'] : _selectedInterests,
       'description': _descController.text.trim(),
-      'user_name': 'You',
+      'user_name': userName,
+      'user_id': user?.id ?? 'guest',
     });
 
     if (mounted) {
       setState(() => _isPosting = false);
       if (posted != null) {
-        final newTrip = TripPost(
-          id: posted['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
-          userName: 'You',
-          userInitials: 'ME',
-          destination: _destController.text.trim(),
-          startDate: _startController.text,
-          endDate: _endController.text,
-          groupSize: _groupSize,
-          currentMembers: 1,
-          interests: _selectedInterests.isEmpty ? ['Travel'] : _selectedInterests,
-          description: _descController.text.trim(),
-          postedAgo: 'Just now',
-        );
-        Navigator.of(context).pop(newTrip); // return to TravelersScreen
+        Navigator.of(context).pop(posted); // return to TravelersScreen
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Failed to post trip. Please try again.')),

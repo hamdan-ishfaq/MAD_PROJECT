@@ -1,7 +1,7 @@
 name: tripgenie
 description: AI-powered travel planner and group match app
 publish_to: 'none'
-version: 1.0.0+1
+version: 2.0.0+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -43,20 +43,33 @@ dependencies:
   url_launcher: ^6.2.4
   permission_handler: ^11.3.0
   geolocator: ^11.0.0
+  uuid: ^4.0.0
 
-  # Real-time Chat (Phase 9)
-  web_socket_channel: ^2.4.0
+  # Security / Crypto
+  crypto: ^3.0.3
 
-  # PDF Export (Phase 11)
+  # Media support
+  image_picker: ^1.0.0
+  file_picker: ^8.1.4
+  photo_view: ^0.15.0
+  video_player: ^2.8.0
+
+  # PDF Export
   pdf: ^3.10.0
   printing: ^5.12.0
   share_plus: ^7.2.1
 
-  # Offline Support (Phase 12)
+  # Offline Support
   sqflite: ^2.4.0
   path_provider: ^2.1.0
   flutter_local_notifications: ^21.0.0
   device_preview: ^1.2.0
+
+  # Firebase (cloud sync layer)
+  firebase_core: ^3.13.0
+  firebase_auth: ^5.5.3
+  cloud_firestore: ^5.6.7
+  firebase_storage: ^12.4.3
 
 flutter:
   uses-material-design: true

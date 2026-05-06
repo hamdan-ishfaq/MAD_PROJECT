@@ -11,6 +11,11 @@ import 'package:tripgenie/core/services/dashboard_service.dart';
 import 'package:tripgenie/core/services/offline_db_service.dart';
 import 'package:tripgenie/core/services/user_preferences_service.dart';
 import 'package:tripgenie/features/dashboard/widgets/saved_itineraries_list.dart';
+import 'package:tripgenie/features/settings/screens/settings_screen.dart';
+import 'package:tripgenie/features/notifications/screens/notifications_screen.dart';
+import 'package:tripgenie/features/emergency/screens/emergency_contacts_screen.dart';
+import 'package:tripgenie/features/social/widgets/community_updates_sheet.dart';
+import 'package:tripgenie/core/services/api_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -161,6 +166,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (mounted) context.go(AppRoutes.login);
   }
 
+  /// Resolve a place ID to a human-readable name.
+  /// Checks the fallback places data first; if not found, capitalizes the ID.
+  String _resolvePlaceName(String placeId) {
+    // Look up in the static fallback data from ApiService
+    try {
+      final places = ApiService.getPlacesSync();
+      final match = places.where((p) => p['id']?.toString() == placeId);
+      if (match.isNotEmpty) return match.first['name']?.toString() ?? placeId;
+    } catch (_) {}
+    // Fallback: try to make it prettier (e.g. "p1" -> "Place 1")
+    if (placeId.startsWith('p') && int.tryParse(placeId.substring(1)) != null) {
+      return 'Saved Place ${placeId.substring(1)}';
+    }
+    return placeId;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -171,50 +192,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
         elevation: 0,
         actions: [
           IconButton(
+            icon: const Icon(Icons.notifications_outlined),
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NotificationsScreen())),
+          ),
+          IconButton(
             icon: const Icon(Icons.settings_outlined),
-            onPressed: () {
-              showModalBottomSheet(
-                context: context,
-                shape: const RoundedRectangleBorder(
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                ),
-                builder: (context) => Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      ListTile(
-                        leading: const Icon(Icons.palette_outlined),
-                        title: const Text('Theme'),
-                        subtitle: const Text('Light / Dark / System'),
-                        onTap: () {},
-                      ),
-                      ListTile(
-                        leading: const Icon(Icons.notifications_none_outlined),
-                        title: const Text('Notifications'),
-                        subtitle: const Text('Manage notification settings'),
-                        onTap: () {},
-                      ),
-                      const Divider(),
-                      ListTile(
-                        leading:
-                            const Icon(Icons.logout_rounded, color: Colors.red),
-                        title: const Text('Log Out',
-                            style: TextStyle(color: Colors.red)),
-                        onTap: () async {
-                          Navigator.of(context).pop();
-                          await _handleLogout();
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen())),
           ),
         ],
       ),
-      body: SingleChildScrollView(
+      body: RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: _loadUser,
+        child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
@@ -346,19 +337,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     );
                   }
 
-                  return Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: favorites
-                        .map(
-                          (placeId) => Chip(
-                            avatar: const Icon(Icons.bookmark_rounded,
-                                size: 16, color: AppColors.primary),
-                            label: Text(placeId),
-                            backgroundColor: AppColors.primaryLight,
+                  return Column(
+                    children: favorites.map((placeId) {
+                      final name = _resolvePlaceName(placeId);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: InkWell(
+                          onTap: () {
+                            CommunityUpdatesSheet.show(
+                              context,
+                              placeId: placeId,
+                              placeName: name,
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryLight,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.bookmark_rounded, size: 20, color: AppColors.primary),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                                ),
+                                const Icon(Icons.chevron_right, size: 18, color: AppColors.textHint),
+                              ],
+                            ),
                           ),
-                        )
-                        .toList(),
+                        ),
+                      );
+                    }).toList(),
                   );
                 },
               ),
@@ -419,9 +432,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
 
+            const SizedBox(height: 16),
+
+            // Quick Actions
+            _ProfileSection(
+              title: 'Quick Actions',
+              child: Column(children: [
+                ListTile(
+                  leading: const Icon(Icons.emergency, color: Colors.red),
+                  title: const Text('Emergency Contacts'),
+                  trailing: const Icon(Icons.chevron_right, color: AppColors.textHint),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const EmergencyContactsScreen())),
+                ),
+              ]),
+            ),
+
             const SizedBox(height: 24),
           ],
         ),
+      ),
       ),
     );
   }

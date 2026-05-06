@@ -10,7 +10,13 @@ class NotificationService {
 
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
     const ios = DarwinInitializationSettings();
-    const settings = InitializationSettings(android: android, iOS: ios);
+    const windows = WindowsInitializationSettings(
+      appName: 'TripGenie',
+      appUserModelId: 'com.tripgenie.wanderland',
+      guid: 'd8f3c6b1-2e44-4b5a-9c7e-1f2a3b4c5d6e',
+    );
+    const settings =
+        InitializationSettings(android: android, iOS: ios, windows: windows);
     await _plugin.initialize(settings: settings);
 
     // Create default channel for Android
@@ -41,8 +47,9 @@ class NotificationService {
       priority: Priority.defaultPriority,
     );
     const iosDetails = DarwinNotificationDetails();
-    const details =
-        NotificationDetails(android: androidDetails, iOS: iosDetails);
+    const windowsDetails = WindowsNotificationDetails();
+    const details = NotificationDetails(
+        android: androidDetails, iOS: iosDetails, windows: windowsDetails);
 
     try {
       await _plugin.show(

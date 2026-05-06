@@ -17,7 +17,7 @@ class _DiscoveryListsScreenState extends State<DiscoveryListsScreen> {
   @override
   void initState() {
     super.initState();
-    _trendingFuture = PlacesService.getTrendingPlaces(city: widget.city);
+    _trendingFuture = PlacesService.getTrendingPlaces();
   }
 
   @override
@@ -64,13 +64,13 @@ class _DiscoveryListsScreenState extends State<DiscoveryListsScreen> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: place.crowdColor.withOpacity(0.2),
+                      color: Colors.blue.withValues(alpha: 0.2), // Default color since Place doesn't have crowdColor directly
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       '${place.crowdLevel.toInt()}% Busy',
-                      style: TextStyle(
-                          color: place.crowdColor,
+                      style: const TextStyle(
+                          color: Colors.blue,
                           fontWeight: FontWeight.bold,
                           fontSize: 12),
                     ),

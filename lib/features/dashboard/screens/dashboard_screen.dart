@@ -7,6 +7,7 @@ import 'package:tripgenie/core/services/dashboard_service.dart';
 import 'package:tripgenie/core/services/offline_db_service.dart';
 import 'package:tripgenie/features/dashboard/widgets/stats_card.dart';
 import 'package:tripgenie/features/dashboard/widgets/saved_itineraries_list.dart';
+import 'package:tripgenie/features/emergency/screens/emergency_contacts_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -294,6 +295,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
         ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'sos_btn',
+        onPressed: () {
+          Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => const EmergencyContactsScreen(),
+          ));
+        },
+        backgroundColor: Colors.red.shade600,
+        icon: const Icon(Icons.sos, color: Colors.white),
+        label: const Text('SOS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       ),
     );
   }

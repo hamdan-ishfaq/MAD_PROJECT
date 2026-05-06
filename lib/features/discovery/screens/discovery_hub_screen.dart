@@ -8,6 +8,7 @@ import 'package:tripgenie/core/services/dashboard_service.dart';
 import 'package:tripgenie/core/services/offline_db_service.dart';
 import 'package:tripgenie/core/services/api_service.dart';
 import 'package:tripgenie/features/social/widgets/community_updates_sheet.dart';
+import 'package:tripgenie/features/notifications/screens/notifications_screen.dart';
 
 class DiscoveryHubScreen extends StatefulWidget {
   const DiscoveryHubScreen({super.key});
@@ -77,6 +78,7 @@ class _DiscoveryHubScreenState extends State<DiscoveryHubScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: RefreshIndicator(
+        color: AppColors.primary,
         onRefresh: _fetchPlaces,
         child: CustomScrollView(
           slivers: [
@@ -84,7 +86,7 @@ class _DiscoveryHubScreenState extends State<DiscoveryHubScreen> {
             SliverAppBar(
               floating: true,
               snap: true,
-              backgroundColor: AppColors.background.withOpacity(0.92),
+              backgroundColor: AppColors.background.withValues(alpha: 0.92),
               surfaceTintColor: Colors.transparent,
               elevation: 0,
               title: Row(
@@ -134,7 +136,9 @@ class _DiscoveryHubScreenState extends State<DiscoveryHubScreen> {
                 IconButton(
                   icon: const Icon(Icons.notifications_none_rounded,
                       color: AppColors.textPrimary),
-                  onPressed: () {},
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+              ),
                 ),
                 const SizedBox(width: 4),
               ],
@@ -231,7 +235,7 @@ class _DiscoveryHubScreenState extends State<DiscoveryHubScreen> {
                                       size: 40, color: Colors.grey.shade400),
                                   const SizedBox(height: 8),
                                   Text(
-                                    'Start the backend to see places',
+                                    'No places yet — pull to refresh',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                       color: Colors.grey.shade600,

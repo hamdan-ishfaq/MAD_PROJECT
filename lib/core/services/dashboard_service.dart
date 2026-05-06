@@ -1,28 +1,15 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:tripgenie/core/models/dashboard_model.dart';
-import 'package:tripgenie/core/config/network_config.dart';
+import 'package:tripgenie/core/services/local_backend_service.dart';
 
-/// Service for dashboard, favorites, and saved itineraries
+/// Service for dashboard, favorites, and saved itineraries.
+/// Now uses local SQLite backend instead of HTTP calls.
 class DashboardService {
-  static String get _baseUrl => NetworkConfig.baseUrl;
-
   // ─── Dashboard ───
 
   static Future<UserDashboard?> getDashboard(String userId) async {
     try {
-      final response = await http
-          .get(
-            Uri.parse('$_baseUrl/users/$userId/dashboard'),
-          )
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        return UserDashboard.fromJson(jsonDecode(response.body));
-      }
-      return null;
+      return await LocalBackendService.getDashboard(userId);
     } catch (e) {
-      print('Error fetching dashboard: $e');
       return null;
     }
   }
@@ -31,46 +18,24 @@ class DashboardService {
 
   static Future<List<String>> getFavorites(String userId) async {
     try {
-      final response = await http
-          .get(
-            Uri.parse('$_baseUrl/users/$userId/favorites'),
-          )
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        return List<String>.from(jsonDecode(response.body));
-      }
-      return [];
+      return await LocalBackendService.getFavorites(userId);
     } catch (e) {
-      print('Error fetching favorites: $e');
       return [];
     }
   }
 
   static Future<bool> addFavorite(String userId, String placeId) async {
     try {
-      final response = await http
-          .post(
-            Uri.parse('$_baseUrl/users/$userId/favorites/$placeId'),
-          )
-          .timeout(const Duration(seconds: 10));
-      return response.statusCode == 200;
+      return await LocalBackendService.addFavorite(userId, placeId);
     } catch (e) {
-      print('Error adding favorite: $e');
       return false;
     }
   }
 
   static Future<bool> removeFavorite(String userId, String placeId) async {
     try {
-      final response = await http
-          .delete(
-            Uri.parse('$_baseUrl/users/$userId/favorites/$placeId'),
-          )
-          .timeout(const Duration(seconds: 10));
-      return response.statusCode == 200;
+      return await LocalBackendService.removeFavorite(userId, placeId);
     } catch (e) {
-      print('Error removing favorite: $e');
       return false;
     }
   }
@@ -86,71 +51,35 @@ class DashboardService {
     required Map<String, dynamic> itineraryJson,
     String status = 'planned',
   }) async {
-    const int maxAttempts = 3;
-    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        final response = await http
-            .post(
-              Uri.parse('$_baseUrl/itineraries/save?user_id=$userId'),
-              headers: {'Content-Type': 'application/json'},
-              body: jsonEncode({
-                'destination': destination,
-                'days': days,
-                'budget': budget,
-                'summary': summary,
-                'itinerary_json': itineraryJson,
-                'status': status,
-              }),
-            )
-            .timeout(const Duration(seconds: 10));
-
-        if (response.statusCode == 200) {
-          return SavedItinerary.fromJson(jsonDecode(response.body));
-        }
-
-        print('SaveItinerary attempt $attempt failed: ${response.statusCode}');
-      } catch (e) {
-        print('Error saving itinerary (attempt $attempt): $e');
-      }
-
-      if (attempt < maxAttempts) {
-        // Exponential backoff
-        await Future.delayed(Duration(milliseconds: 500 * attempt));
-      }
+    try {
+      return await LocalBackendService.saveItinerary(
+        userId: userId,
+        destination: destination,
+        days: days,
+        budget: budget,
+        summary: summary,
+        itineraryJson: itineraryJson,
+        status: status,
+      );
+    } catch (e) {
+      return null;
     }
-
-    return null;
   }
 
-  static Future<List<SavedItinerary>> getSavedItineraries(String userId) async {
+  static Future<List<SavedItinerary>> getSavedItineraries(
+      String userId) async {
     try {
-      final response = await http
-          .get(
-            Uri.parse('$_baseUrl/users/$userId/itineraries'),
-          )
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as List;
-        return data.map((json) => SavedItinerary.fromJson(json)).toList();
-      }
-      return [];
+      return await LocalBackendService.getSavedItineraries(userId);
     } catch (e) {
-      print('Error fetching saved itineraries: $e');
       return [];
     }
   }
 
-  static Future<bool> deleteItinerary(String itineraryId, String userId) async {
+  static Future<bool> deleteItinerary(
+      String itineraryId, String userId) async {
     try {
-      final response = await http
-          .delete(
-            Uri.parse('$_baseUrl/itineraries/$itineraryId?user_id=$userId'),
-          )
-          .timeout(const Duration(seconds: 10));
-      return response.statusCode == 200;
+      return await LocalBackendService.deleteItinerary(itineraryId, userId);
     } catch (e) {
-      print('Error deleting itinerary: $e');
       return false;
     }
   }
