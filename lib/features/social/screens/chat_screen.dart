@@ -308,10 +308,11 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white, elevation: 0,
+        backgroundColor: theme.scaffoldBackgroundColor, elevation: 0,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -357,14 +358,14 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            color: Colors.white,
+            color: theme.scaffoldBackgroundColor,
             child: Row(children: [
               const Icon(Icons.info_outline_rounded, size: 14, color: AppColors.textSecondary),
               const SizedBox(width: 6),
               Expanded(child: Text(widget.trip.description, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary))),
             ]),
           ),
-          const Divider(height: 1, color: AppColors.border),
+          Divider(height: 1, color: theme.dividerColor),
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
@@ -404,8 +405,10 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildInputBar() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
-      color: Colors.white,
+      color: theme.scaffoldBackgroundColor,
       padding: EdgeInsets.only(left: 8, right: 8, top: 8, bottom: MediaQuery.of(context).viewInsets.bottom + 8),
       child: Row(children: [
         IconButton(
@@ -419,7 +422,8 @@ class _ChatScreenState extends State<ChatScreen> {
             onSubmitted: (_) => _sendMessage(),
             decoration: InputDecoration(
               hintText: 'Type a message…',
-              filled: true, fillColor: AppColors.background,
+              filled: true,
+              fillColor: isDark ? const Color(0xFF1E293B) : AppColors.background,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             ),

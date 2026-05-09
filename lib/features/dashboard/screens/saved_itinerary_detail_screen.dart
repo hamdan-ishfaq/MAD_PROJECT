@@ -13,13 +13,17 @@ class SavedItineraryDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final surfaceColor = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final borderColor = isDark ? const Color(0xFF334155) : AppColors.border;
     final days = itinerary.itinerary['day_plans'] as List<dynamic>? ?? const [];
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Saved Itinerary'),
-        backgroundColor: Colors.white,
+        backgroundColor: theme.scaffoldBackgroundColor,
         elevation: 0,
       ),
       body: SingleChildScrollView(
@@ -102,7 +106,11 @@ class SavedItineraryDetailScreen extends StatelessWidget {
               )
             else
               ...days
-                  .map((day) => _DayPlanCard(day: day as Map<String, dynamic>))
+                  .map((day) => _DayPlanCard(
+                        day: day as Map<String, dynamic>,
+                        surfaceColor: surfaceColor,
+                        borderColor: borderColor,
+                      ))
                   .toList(),
             const SizedBox(height: 8),
             const Text(
@@ -114,7 +122,11 @@ class SavedItineraryDetailScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            _SavedItineraryWeather(destination: itinerary.destination),
+            _SavedItineraryWeather(
+              destination: itinerary.destination,
+              surfaceColor: surfaceColor,
+              borderColor: borderColor,
+            ),
           ],
         ),
       ),
@@ -124,8 +136,14 @@ class SavedItineraryDetailScreen extends StatelessWidget {
 
 class _SavedItineraryWeather extends StatelessWidget {
   final String destination;
+  final Color surfaceColor;
+  final Color borderColor;
 
-  const _SavedItineraryWeather({required this.destination});
+  const _SavedItineraryWeather({
+    required this.destination,
+    required this.surfaceColor,
+    required this.borderColor,
+  });
 
   Future<String> _loadWeatherSummary() async {
     final coordinates = await _resolveCoordinates(destination);
@@ -202,9 +220,9 @@ class _SavedItineraryWeather extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: surfaceColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: borderColor),
       ),
       child: FutureBuilder<String>(
         future: _loadWeatherSummary(),
@@ -261,8 +279,14 @@ class _MetaChip extends StatelessWidget {
 
 class _DayPlanCard extends StatelessWidget {
   final Map<String, dynamic> day;
+  final Color surfaceColor;
+  final Color borderColor;
 
-  const _DayPlanCard({required this.day});
+  const _DayPlanCard({
+    required this.day,
+    required this.surfaceColor,
+    required this.borderColor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -272,9 +296,9 @@ class _DayPlanCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: surfaceColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: borderColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

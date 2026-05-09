@@ -75,8 +75,9 @@ class _DiscoveryHubScreenState extends State<DiscoveryHubScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: RefreshIndicator(
         color: AppColors.primary,
         onRefresh: _fetchPlaces,
@@ -86,7 +87,7 @@ class _DiscoveryHubScreenState extends State<DiscoveryHubScreen> {
             SliverAppBar(
               floating: true,
               snap: true,
-              backgroundColor: AppColors.background.withValues(alpha: 0.92),
+              backgroundColor: theme.scaffoldBackgroundColor.withValues(alpha: 0.92),
               surfaceTintColor: Colors.transparent,
               elevation: 0,
               title: Row(

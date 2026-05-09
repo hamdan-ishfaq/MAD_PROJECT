@@ -62,10 +62,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white, elevation: 0,
+        backgroundColor: theme.scaffoldBackgroundColor, elevation: 0,
         title: const Text('Notifications', style: TextStyle(fontWeight: FontWeight.w700)),
         actions: [
           if (_notifications.any((n) => n['is_read'] == 0))

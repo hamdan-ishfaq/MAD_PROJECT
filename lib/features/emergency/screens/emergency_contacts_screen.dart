@@ -75,9 +75,10 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(backgroundColor: Colors.white, elevation: 0, title: const Text('Emergency Contacts', style: TextStyle(fontWeight: FontWeight.w700))),
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(backgroundColor: theme.scaffoldBackgroundColor, elevation: 0, title: const Text('Emergency Contacts', style: TextStyle(fontWeight: FontWeight.w700))),
       body: RefreshIndicator(
         color: AppColors.primary,
         onRefresh: _loadContacts,
