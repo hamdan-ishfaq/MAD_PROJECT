@@ -110,15 +110,22 @@ class _ExpenseTrackerScreenState extends State<ExpenseTrackerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final surfaceColor = isDark ? AppColors.surfaceDark : Colors.white;
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(backgroundColor: Colors.white, elevation: 0, title: Text(widget.tripName, style: const TextStyle(fontWeight: FontWeight.w700))),
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        elevation: 0,
+        title: Text(widget.tripName, style: const TextStyle(fontWeight: FontWeight.w700))
+      ),
       body: RefreshIndicator(
         color: AppColors.primary,
         onRefresh: _loadExpenses,
         child: Column(children: [
           Container(
-            width: double.infinity, padding: const EdgeInsets.all(20), color: Colors.white,
+            width: double.infinity, padding: const EdgeInsets.all(20), color: surfaceColor,
             child: Column(children: [
               const Text('Total Expenses', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
               const SizedBox(height: 4),
@@ -163,7 +170,7 @@ class _ExpenseTrackerScreenState extends State<ExpenseTrackerScreen> {
                           final cat = e['category'] as String? ?? 'Other';
                           return Container(
                             margin: const EdgeInsets.only(bottom: 8),
-                            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+                            decoration: BoxDecoration(color: surfaceColor, borderRadius: BorderRadius.circular(12)),
                             child: ListTile(
                               leading: CircleAvatar(backgroundColor: AppColors.primaryLight, child: Icon(_iconForCategory(cat), color: AppColors.primary, size: 20)),
                               title: Text(e['description'] as String? ?? cat, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),

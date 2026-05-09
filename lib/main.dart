@@ -6,7 +6,7 @@ import 'package:tripgenie/core/theme/app_theme.dart';
 import 'package:tripgenie/core/routes/app_routes.dart';
 import 'package:tripgenie/core/services/app_data_reset_service.dart';
 import 'package:tripgenie/core/services/notification_service.dart';
-
+import 'package:tripgenie/core/services/step_counter_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.system);
@@ -45,6 +45,9 @@ void main() async {
   if (isDark != null) {
     themeNotifier.value = isDark ? ThemeMode.dark : ThemeMode.light;
   }
+
+  // Start pedometer step counting
+  StepCounterService.start();
 
   runApp(const WanderlandApp());
 }
