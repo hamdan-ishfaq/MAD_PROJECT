@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tripgenie/core/constants/app_colors.dart';
 import 'package:tripgenie/core/constants/app_strings.dart';
 import 'package:tripgenie/core/models/dashboard_model.dart';
@@ -11,7 +12,6 @@ import 'package:tripgenie/core/services/dashboard_service.dart';
 import 'package:tripgenie/core/services/offline_db_service.dart';
 import 'package:tripgenie/core/services/user_preferences_service.dart';
 import 'package:tripgenie/core/services/step_counter_service.dart';
-import 'package:tripgenie/core/services/local_backend_service.dart';
 import 'package:tripgenie/features/dashboard/widgets/saved_itineraries_list.dart';
 import 'package:tripgenie/features/settings/screens/settings_screen.dart';
 import 'package:tripgenie/features/notifications/screens/notifications_screen.dart';
@@ -77,9 +77,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadUser() async {
     final user = await AuthService.loadUser();
+    // Count trips the user has joined via SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    final joinedCount = prefs.getKeys()
+        .where((k) => k.startsWith('joined_trip_') && prefs.getBool(k) == true)
+        .length;
     if (user != null && mounted) {
-      final trips = await LocalBackendService.getTrips();
-      final userTrips = trips.where((t) => t.userName == user.name || t.userInitials == user.name.substring(0, 2).toUpperCase()).length;
       setState(() {
         _userId = user.id;
         _userName = user.name.isNotEmpty ? user.name : user.email.split('@')[0];
@@ -87,13 +90,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _userInitials = _userName.length >= 2
             ? _userName.substring(0, 2).toUpperCase()
             : _userName.toUpperCase();
-        _tripsCount = userTrips;
+        _tripsCount = joinedCount;
         _savedItinerariesFuture = _loadSavedItineraries(user.id);
         _favoritesFuture = _loadFavoritePlaces(user.id);
       });
       await _loadInterests(user.id);
     } else if (mounted) {
       setState(() {
+        _tripsCount = joinedCount;
         _savedItinerariesFuture = _loadSavedItineraries(_userId);
         _favoritesFuture = _loadFavoritePlaces(_userId);
       });

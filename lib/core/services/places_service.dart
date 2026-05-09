@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:tripgenie/core/models/place_model.dart';
-import 'package:tripgenie/core/services/api_service.dart';
 
 class _CacheEntry {
   final dynamic data;
@@ -19,6 +18,20 @@ class PlacesService {
   static String get _opentripmapKey => dotenv.env['OPENTRIPMAP_KEY'] ?? '';
   
   static final Map<String, _CacheEntry> _cache = {};
+
+  /// Static fallback used when the API is unavailable.
+  static const List<Map<String, dynamic>> _fallbackPlaces = [
+    {'id': 'p1', 'name': 'Faisal Mosque', 'category': 'Culture', 'lat': 33.7295, 'lng': 73.0372, 'rating': 4.8, 'crowdLevel': 0.7},
+    {'id': 'p2', 'name': 'Daman-e-Koh', 'category': 'Parks', 'lat': 33.7384, 'lng': 73.0586, 'rating': 4.5, 'crowdLevel': 0.4},
+    {'id': 'p3', 'name': 'Monal Restaurant', 'category': 'Food', 'lat': 33.7440, 'lng': 73.0640, 'rating': 4.3, 'crowdLevel': 0.8},
+    {'id': 'p4', 'name': 'Centaurus Mall', 'category': 'Shopping', 'lat': 33.7085, 'lng': 73.0508, 'rating': 4.1, 'crowdLevel': 0.9},
+    {'id': 'p5', 'name': 'Pakistan Monument', 'category': 'Culture', 'lat': 33.6932, 'lng': 73.0688, 'rating': 4.7, 'crowdLevel': 0.3},
+    {'id': 'p6', 'name': 'Trail 3 (Margalla)', 'category': 'Parks', 'lat': 33.7500, 'lng': 73.0650, 'rating': 4.6, 'crowdLevel': 0.5},
+    {'id': 'p7', 'name': 'Lok Virsa Museum', 'category': 'Culture', 'lat': 33.6967, 'lng': 73.0715, 'rating': 4.2, 'crowdLevel': 0.2},
+    {'id': 'p8', 'name': 'Saidpur Village', 'category': 'Food', 'lat': 33.7397, 'lng': 73.0667, 'rating': 4.4, 'crowdLevel': 0.6},
+    {'id': 'p9', 'name': 'Serena Hotel', 'category': 'Hotels', 'lat': 33.7118, 'lng': 73.0901, 'rating': 4.9, 'crowdLevel': 0.4},
+    {'id': 'p10', 'name': 'F-7 Jinnah Super', 'category': 'Shopping', 'lat': 33.7136, 'lng': 73.0575, 'rating': 4.0, 'crowdLevel': 0.7},
+  ];
 
   // Get place details by ID (from OpenTripMap)
   static Future<Place?> getPlaceDetails(String xid) async {
@@ -142,9 +155,9 @@ class PlacesService {
             
             String apiKinds = p['kinds']?.toString() ?? '';
             String finalCategory = 'Attraction';
-            if (apiKinds.contains('foods') || apiKinds.contains('restaurants')) finalCategory = 'Food';
+            if (apiKinds.contains('foods') || apiKinds.contains('restaurants') || apiKinds.contains('cafes')) finalCategory = 'Food';
             else if (apiKinds.contains('shops') || apiKinds.contains('malls')) finalCategory = 'Shopping';
-            else if (apiKinds.contains('accommodations') || apiKinds.contains('hotels')) finalCategory = 'Hotels';
+            else if (apiKinds.contains('accomodations') || apiKinds.contains('accommodations') || apiKinds.contains('hotels') || apiKinds.contains('hostels') || apiKinds.contains('guest_houses')) finalCategory = 'Hotels';
             else if (apiKinds.contains('natural') || apiKinds.contains('urban_environment')) finalCategory = 'Parks';
             else if (apiKinds.contains('cultural') || apiKinds.contains('religion') || apiKinds.contains('historic')) finalCategory = 'Culture';
             else if (category != null && category != 'All') finalCategory = category;
@@ -182,13 +195,13 @@ class PlacesService {
 
     // If API key is missing or OTM fails, use the internal static fallback
     if (category != null && category.isNotEmpty && category != 'All') {
-      final res = ApiService.fallbackPlaces
+      final res = _fallbackPlaces
           .where((p) => (p['category'] as String).toLowerCase() == category.toLowerCase())
-          .map((e) => Place.fromJson(e as Map<String, dynamic>)).toList();
+          .map((e) => Place.fromJson(e)).toList();
       _cache[cacheKey] = _CacheEntry(res);
       return res;
     }
-    final fallbackRes = ApiService.fallbackPlaces.map((e) => Place.fromJson(e as Map<String, dynamic>)).toList();
+    final fallbackRes = _fallbackPlaces.map((e) => Place.fromJson(e)).toList();
     _cache[cacheKey] = _CacheEntry(fallbackRes);
     return fallbackRes;
   }
@@ -199,10 +212,20 @@ class PlacesService {
       return _cache[cacheKey]!.data as List<Place>;
     }
 
-    final dynamicData = await ApiService.getTrendingPlaces(limit: limit);
-    final places = dynamicData.map((e) => Place.fromJson(e as Map<String, dynamic>)).toList();
-    _cache[cacheKey] = _CacheEntry(places);
-    return places;
+    // Use nearby places from default coords; fallback to static list sorted by rating
+    try {
+      final nearby = await getNearbyPlaces(latitude: 33.6844, longitude: 73.0479, limit: 50);
+      final sorted = [...nearby]..sort((a, b) => b.rating.compareTo(a.rating));
+      final result = sorted.take(limit).toList();
+      _cache[cacheKey] = _CacheEntry(result);
+      return result;
+    } catch (_) {
+      final sorted = [..._fallbackPlaces]
+        ..sort((a, b) => ((b['rating'] as num?) ?? 0).compareTo((a['rating'] as num?) ?? 0));
+      final result = sorted.take(limit).map((e) => Place.fromJson(e)).toList();
+      _cache[cacheKey] = _CacheEntry(result);
+      return result;
+    }
   }
 
   // Helper: Parse place from API response

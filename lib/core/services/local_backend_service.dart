@@ -21,18 +21,31 @@ class LocalBackendService {
   static const int _dbVersion = 2;
   static const _uuid = Uuid();
 
+  // In-memory storage for Web platform
+  static final Map<String, List<Map<String, dynamic>>> _webStorage = {
+    'users': [],
+    'trips': [],
+    'chat_messages': [],
+    'community_updates': [],
+    'favorites': [],
+    'saved_itineraries': [],
+    'user_stats': [],
+    'expenses': [],
+    'notifications': [],
+    'emergency_contacts': [],
+  };
+
   // ─── Database Setup ───
 
-  static Future<Database> get database async {
+  static Future<Database?> get database async {
+    if (kIsWeb) return null; // No physical DB on web
     if (_database != null) return _database!;
     _database = await _initDatabase();
     return _database!;
   }
 
-  static Future<Database> _initDatabase() async {
-    if (kIsWeb) {
-      throw UnsupportedError('SQLite backend is not available on web');
-    }
+  static Future<Database?> _initDatabase() async {
+    if (kIsWeb) return null;
     final dir = await getApplicationDocumentsDirectory();
     final path = '${dir.path}/$_dbName';
 
@@ -250,20 +263,27 @@ class LocalBackendService {
     }
   }
 
-  static Future<void> _seedDemoUser(Database db) async {
+  static Future<void> _seedDemoUser(Database? db) async {
     final hash = _hashPassword('password123');
-    await db.insert(
-      'users',
-      {
-        'id': 'user_1',
-        'name': 'Demo User',
-        'email': 'demo@example.com',
-        'password_hash': hash,
-        'token': 'demo-token-${_uuid.v4()}',
-        'created_at': DateTime.now().toIso8601String(),
-      },
-      conflictAlgorithm: ConflictAlgorithm.ignore,
-    );
+    final row = {
+      'id': 'user_1',
+      'name': 'Demo User',
+      'email': 'demo@example.com',
+      'password_hash': hash,
+      'token': 'demo-token-${_uuid.v4()}',
+      'created_at': DateTime.now().toIso8601String(),
+    };
+
+    if (kIsWeb) {
+      _webStorage['users']!.add(row);
+      _webStorage['user_stats']!.add({'user_id': 'user_1'});
+    } else {
+      await db!.insert(
+        'users',
+        row,
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+    }
   }
 
   // ─── Auth ───
@@ -284,16 +304,34 @@ class LocalBackendService {
   }) async {
     final db = await database;
 
-    // Check if email exists
-    final existing =
-        await db.query('users', where: 'email = ?', whereArgs: [email]);
+    if (kIsWeb) {
+      final existing = _webStorage['users']!.any((u) => u['email'] == email);
+      if (existing) return null;
+
+      final id = 'user_${_uuid.v4().substring(0, 8)}';
+      final token = _generateToken(email);
+      final user = {
+        'id': id,
+        'name': name,
+        'email': email,
+        'password_hash': _hashPassword(password),
+        'token': token,
+        'created_at': DateTime.now().toIso8601String(),
+      };
+      _webStorage['users']!.add(user);
+      _webStorage['user_stats']!.add({'user_id': id});
+      return {'id': id, 'name': name, 'email': email, 'token': token};
+    }
+
+    // Mobile implementation
+    final existing = await db!.query('users', where: 'email = ?', whereArgs: [email]);
     if (existing.isNotEmpty) return null; // Email taken
 
     final id = 'user_${_uuid.v4().substring(0, 8)}';
     final hash = _hashPassword(password);
     final token = _generateToken(email);
 
-    await db.insert('users', {
+    await db!.insert('users', {
       'id': id,
       'name': name,
       'email': email,
@@ -303,7 +341,7 @@ class LocalBackendService {
     });
 
     // Initialize stats for the new user
-    await db.insert(
+    await db!.insert(
       'user_stats',
       {'user_id': id},
       conflictAlgorithm: ConflictAlgorithm.ignore,
@@ -319,7 +357,16 @@ class LocalBackendService {
     final db = await database;
     final hash = _hashPassword(password);
 
-    final results = await db.query(
+    if (kIsWeb) {
+      final matches = _webStorage['users']!.where((u) => u['email'] == email && u['password_hash'] == hash);
+      if (matches.isEmpty) return null;
+      final user = Map<String, dynamic>.from(matches.first);
+      final token = _generateToken(email);
+      user['token'] = token;
+      return user;
+    }
+
+    final results = await db!.query(
       'users',
       where: 'email = ? AND password_hash = ?',
       whereArgs: [email, hash],
@@ -331,7 +378,7 @@ class LocalBackendService {
     final token = _generateToken(email);
 
     // Update token
-    await db.update(
+    await db!.update(
       'users',
       {'token': token},
       where: 'id = ?',
@@ -352,15 +399,20 @@ class LocalBackendService {
     final db = await database;
     List<Map<String, dynamic>> results;
 
-    if (destination.isNotEmpty) {
-      results = await db.query(
+    if (kIsWeb) {
+      results = List<Map<String, dynamic>>.from(_webStorage['trips']!);
+      if (destination.isNotEmpty) {
+        results = results.where((t) => t['destination'].toString().toLowerCase().contains(destination.toLowerCase())).toList();
+      }
+    } else if (destination.isNotEmpty) {
+      results = await db!.query(
         'trips',
         where: 'destination LIKE ?',
         whereArgs: ['%$destination%'],
         orderBy: 'created_at DESC',
       );
     } else {
-      results = await db.query('trips', orderBy: 'created_at DESC');
+      results = await db!.query('trips', orderBy: 'created_at DESC');
     }
 
     return results.map((row) {
@@ -384,7 +436,7 @@ class LocalBackendService {
     final db = await database;
     final id = _uuid.v4();
 
-    await db.insert('trips', {
+    final row = {
       'id': id,
       'destination': data['destination'],
       'start_date': data['start_date'],
@@ -397,7 +449,13 @@ class LocalBackendService {
       'user_id': data['user_id'],
       'posted_ago': 'Just now',
       'created_at': DateTime.now().toIso8601String(),
-    });
+    };
+
+    if (kIsWeb) {
+      _webStorage['trips']!.add(row);
+    } else {
+      await db!.insert('trips', row);
+    }
 
     return TripPost(
       id: id,
@@ -414,18 +472,48 @@ class LocalBackendService {
     );
   }
 
+  /// Increment current_members for a trip when a user joins it.
+  static Future<void> joinTrip(String tripId, String userId) async {
+    final db = await database;
+    if (kIsWeb) {
+      final idx = _webStorage['trips']!.indexWhere((t) => t['id'] == tripId);
+      if (idx >= 0) {
+        final current = (_webStorage['trips']![idx]['current_members'] as int?) ?? 1;
+        _webStorage['trips']![idx] = {..._webStorage['trips']![idx], 'current_members': current + 1};
+      }
+      return;
+    }
+    await db?.rawUpdate(
+      'UPDATE trips SET current_members = MIN(current_members + 1, group_size) WHERE id = ?',
+      [tripId],
+    );
+  }
+
   // ─── Chat Messages ───
 
   static Future<List<ChatMessage>> getChatHistory(String tripId,
       {int limit = 200, String? currentUserId}) async {
     final db = await database;
-    final results = await db.query(
-      'chat_messages',
-      where: 'trip_id = ?',
-      whereArgs: [tripId],
-      orderBy: 'timestamp ASC',
-      limit: limit,
-    );
+    List<Map<String, dynamic>> results;
+
+    if (kIsWeb) {
+      results = _webStorage['chat_messages']!
+          .where((m) => m['trip_id'] == tripId)
+          .toList();
+      // Sort by timestamp
+      results.sort((a, b) => a['timestamp'].toString().compareTo(b['timestamp'].toString()));
+      if (results.length > limit) {
+        results = results.sublist(results.length - limit);
+      }
+    } else {
+      results = await db!.query(
+        'chat_messages',
+        where: 'trip_id = ?',
+        whereArgs: [tripId],
+        orderBy: 'timestamp ASC',
+        limit: limit,
+      );
+    }
 
     return results.map((row) {
       final senderId = row['sender_id'] as String? ?? '';
@@ -454,25 +542,31 @@ class LocalBackendService {
   }) async {
     final db = await database;
 
-    await db.insert(
-      'chat_messages',
-      {
-        'id': message.id,
-        'trip_id': tripId,
-        'sender_id': message.senderId,
-        'sender_name': message.senderName,
-        'sender_initials': message.senderInitials,
-        'text': message.text,
-        'message_type': message.messageType.name,
-        'media_path': message.mediaPath,
-        'media_mime_type': message.mediaMimeType,
-        'file_name': message.fileName,
-        'file_size': message.fileSize,
-        'rating': message.rating,
-        'timestamp': message.timestamp.toIso8601String(),
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    final row = {
+      'id': message.id,
+      'trip_id': tripId,
+      'sender_id': message.senderId,
+      'sender_name': message.senderName,
+      'sender_initials': message.senderInitials,
+      'text': message.text,
+      'message_type': message.messageType.name,
+      'media_path': message.mediaPath,
+      'media_mime_type': message.mediaMimeType,
+      'file_name': message.fileName,
+      'file_size': message.fileSize,
+      'rating': message.rating,
+      'timestamp': message.timestamp.toIso8601String(),
+    };
+
+    if (kIsWeb) {
+      _webStorage['chat_messages']!.add(row);
+    } else {
+      await db!.insert(
+        'chat_messages',
+        row,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
 
     return message;
   }
@@ -482,12 +576,21 @@ class LocalBackendService {
   static Future<List<CommunityUpdate>> getCommunityUpdates(
       String placeId) async {
     final db = await database;
-    final results = await db.query(
-      'community_updates',
-      where: 'place_id = ?',
-      whereArgs: [placeId],
-      orderBy: 'timestamp DESC',
-    );
+    List<Map<String, dynamic>> results;
+
+    if (kIsWeb) {
+      results = _webStorage['community_updates']!
+          .where((u) => u['place_id'] == placeId)
+          .toList();
+      results.sort((a, b) => b['timestamp'].toString().compareTo(a['timestamp'].toString()));
+    } else {
+      results = await db!.query(
+        'community_updates',
+        where: 'place_id = ?',
+        whereArgs: [placeId],
+        orderBy: 'timestamp DESC',
+      );
+    }
 
     return results.map((row) {
       return CommunityUpdate(
@@ -520,7 +623,7 @@ class LocalBackendService {
     final id = _uuid.v4();
     final now = DateTime.now();
 
-    await db.insert('community_updates', {
+    final row = {
       'id': id,
       'place_id': placeId,
       'user_id': userId,
@@ -532,7 +635,13 @@ class LocalBackendService {
       'user_liked': 0,
       'images': '[]',
       'timestamp': now.toIso8601String(),
-    });
+    };
+
+    if (kIsWeb) {
+      _webStorage['community_updates']!.add(row);
+    } else {
+      await db!.insert('community_updates', row);
+    }
 
     return CommunityUpdate(
       id: id,
@@ -551,17 +660,33 @@ class LocalBackendService {
 
   static Future<bool> toggleLike(String placeId, String updateId) async {
     final db = await database;
-    await db.rawUpdate(
-      'UPDATE community_updates SET likes = likes + 1 WHERE id = ? AND place_id = ?',
-      [updateId, placeId],
-    );
+    if (kIsWeb) {
+      final list = _webStorage['community_updates']!;
+      for (var i = 0; i < list.length; i++) {
+        if (list[i]['id'] == updateId && list[i]['place_id'] == placeId) {
+          final copy = Map<String, dynamic>.from(list[i]);
+          copy['likes'] = (copy['likes'] as int? ?? 0) + 1;
+          list[i] = copy;
+          break;
+        }
+      }
+    } else {
+      await db!.rawUpdate(
+        'UPDATE community_updates SET likes = likes + 1 WHERE id = ? AND place_id = ?',
+        [updateId, placeId],
+      );
+    }
     return true;
   }
 
   static Future<bool> deleteCommunityUpdate(
       String placeId, String updateId) async {
     final db = await database;
-    final count = await db.delete(
+    if (kIsWeb) {
+      _webStorage['community_updates']!.removeWhere((u) => u['id'] == updateId && u['place_id'] == placeId);
+      return true;
+    }
+    final count = await db!.delete(
       'community_updates',
       where: 'id = ? AND place_id = ?',
       whereArgs: [updateId, placeId],
@@ -573,32 +698,30 @@ class LocalBackendService {
 
   static Future<UserDashboard> getDashboard(String userId) async {
     final db = await database;
+    Map<String, dynamic> stats = {};
+    List<String> favIds = [];
+    int itineraryCount = 0;
 
-    // Get stats
-    final statsRows = await db.query(
-      'user_stats',
-      where: 'user_id = ?',
-      whereArgs: [userId],
-    );
+    if (kIsWeb) {
+      final statsList = _webStorage['user_stats']!.where((s) => s['user_id'] == userId);
+      if (statsList.isNotEmpty) stats = statsList.first;
+      favIds = _webStorage['favorites']!
+          .where((f) => f['user_id'] == userId)
+          .map((f) => f['place_id'] as String)
+          .toList();
+      itineraryCount = _webStorage['saved_itineraries']!
+          .where((i) => i['user_id'] == userId)
+          .length;
+    } else {
+      final statsRows = await db!.query('user_stats', where: 'user_id = ?', whereArgs: [userId]);
+      if (statsRows.isNotEmpty) stats = statsRows.first;
 
-    final stats = statsRows.isNotEmpty
-        ? statsRows.first
-        : <String, dynamic>{};
+      final favRows = await db!.query('favorites', where: 'user_id = ?', whereArgs: [userId]);
+      favIds = favRows.map((r) => r['place_id'] as String).toList();
 
-    // Get favorites
-    final favRows = await db.query(
-      'favorites',
-      where: 'user_id = ?',
-      whereArgs: [userId],
-    );
-    final favIds = favRows.map((r) => r['place_id'] as String).toList();
-
-    // Get saved itineraries count
-    final itinRows = await db.query(
-      'saved_itineraries',
-      where: 'user_id = ?',
-      whereArgs: [userId],
-    );
+      final itinRows = await db!.query('saved_itineraries', where: 'user_id = ?', whereArgs: [userId]);
+      itineraryCount = itinRows.length;
+    }
 
     return UserDashboard(
       tripsCompleted: stats['trips_completed'] as int? ?? 0,
@@ -606,16 +729,15 @@ class LocalBackendService {
       reviewsContributed: stats['reviews_contributed'] as int? ?? 0,
       totalDaysTraveled: stats['total_days_traveled'] as int? ?? 0,
       citiesVisited: stats['cities_visited'] as int? ?? 0,
-      totalBudgetSpent:
-          (stats['total_budget_spent'] as num?)?.toDouble() ?? 0.0,
+      totalBudgetSpent: (stats['total_budget_spent'] as num?)?.toDouble() ?? 0.0,
       favoritePlaceIds: favIds,
-      savedItinerariesCount: itinRows.length,
+      savedItinerariesCount: itineraryCount,
     );
   }
 
   static Future<List<String>> getFavorites(String userId) async {
     final db = await database;
-    final rows = await db.query(
+    final rows = await db!.query(
       'favorites',
       where: 'user_id = ?',
       whereArgs: [userId],
@@ -625,25 +747,36 @@ class LocalBackendService {
 
   static Future<bool> addFavorite(String userId, String placeId) async {
     final db = await database;
-    await db.insert(
-      'favorites',
-      {
-        'place_id': placeId,
-        'user_id': userId,
-        'added_at': DateTime.now().toIso8601String(),
-      },
-      conflictAlgorithm: ConflictAlgorithm.ignore,
-    );
+    final row = {
+      'place_id': placeId,
+      'user_id': userId,
+      'added_at': DateTime.now().toIso8601String(),
+    };
+
+    if (kIsWeb) {
+      final exists = _webStorage['favorites']!.any((f) => f['place_id'] == placeId && f['user_id'] == userId);
+      if (!exists) _webStorage['favorites']!.add(row);
+    } else {
+      await db!.insert(
+        'favorites',
+        row,
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+    }
     return true;
   }
 
   static Future<bool> removeFavorite(String userId, String placeId) async {
     final db = await database;
-    await db.delete(
-      'favorites',
-      where: 'place_id = ? AND user_id = ?',
-      whereArgs: [placeId, userId],
-    );
+    if (kIsWeb) {
+      _webStorage['favorites']!.removeWhere((f) => f['place_id'] == placeId && f['user_id'] == userId);
+    } else {
+      await db!.delete(
+        'favorites',
+        where: 'place_id = ? AND user_id = ?',
+        whereArgs: [placeId, userId],
+      );
+    }
     return true;
   }
 
@@ -660,23 +793,29 @@ class LocalBackendService {
     final id = _uuid.v4();
     final now = DateTime.now();
 
-    await db.insert(
-      'saved_itineraries',
-      {
-        'id': id,
-        'user_id': userId,
-        'destination': destination,
-        'days': days,
-        'budget': budget,
-        'summary': summary,
-        'itinerary_json': jsonEncode(itineraryJson),
-        'status': status,
-        'is_favorite': 0,
-        'created_at': now.toIso8601String(),
-        'updated_at': now.toIso8601String(),
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    final row = {
+      'id': id,
+      'user_id': userId,
+      'destination': destination,
+      'days': days,
+      'budget': budget,
+      'summary': summary,
+      'itinerary_json': jsonEncode(itineraryJson),
+      'status': status,
+      'is_favorite': 0,
+      'created_at': now.toIso8601String(),
+      'updated_at': now.toIso8601String(),
+    };
+
+    if (kIsWeb) {
+      _webStorage['saved_itineraries']!.add(row);
+    } else {
+      await db!.insert(
+        'saved_itineraries',
+        row,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
 
     return SavedItinerary(
       id: id,
@@ -696,12 +835,21 @@ class LocalBackendService {
   static Future<List<SavedItinerary>> getSavedItineraries(
       String userId) async {
     final db = await database;
-    final rows = await db.query(
-      'saved_itineraries',
-      where: 'user_id = ?',
-      whereArgs: [userId],
-      orderBy: 'created_at DESC',
-    );
+    List<Map<String, dynamic>> rows;
+
+    if (kIsWeb) {
+      rows = _webStorage['saved_itineraries']!
+          .where((i) => i['user_id'] == userId)
+          .toList();
+      rows.sort((a, b) => b['created_at'].toString().compareTo(a['created_at'].toString()));
+    } else {
+      rows = await db!.query(
+        'saved_itineraries',
+        where: 'user_id = ?',
+        whereArgs: [userId],
+        orderBy: 'created_at DESC',
+      );
+    }
 
     return rows.map((row) {
       return SavedItinerary(
@@ -728,7 +876,11 @@ class LocalBackendService {
   static Future<bool> deleteItinerary(
       String itineraryId, String userId) async {
     final db = await database;
-    final count = await db.delete(
+    if (kIsWeb) {
+      _webStorage['saved_itineraries']!.removeWhere((i) => i['id'] == itineraryId && i['user_id'] == userId);
+      return true;
+    }
+    final count = await db!.delete(
       'saved_itineraries',
       where: 'id = ? AND user_id = ?',
       whereArgs: [itineraryId, userId],
@@ -746,7 +898,7 @@ class LocalBackendService {
     String? relatedId,
   }) async {
     final db = await database;
-    await db.insert('notifications', {
+    final row = {
       'id': _uuid.v4(),
       'user_id': userId,
       'title': title,
@@ -755,13 +907,26 @@ class LocalBackendService {
       'related_id': relatedId,
       'is_read': 0,
       'created_at': DateTime.now().toIso8601String(),
-    });
+    };
+
+    if (kIsWeb) {
+      _webStorage['notifications']!.add(row);
+    } else {
+      await db!.insert('notifications', row);
+    }
   }
 
   static Future<List<Map<String, dynamic>>> getNotifications(
       String userId) async {
     final db = await database;
-    return await db.query(
+    if (kIsWeb) {
+      final list = _webStorage['notifications']!
+          .where((n) => n['user_id'] == userId)
+          .toList();
+      list.sort((a, b) => b['created_at'].toString().compareTo(a['created_at'].toString()));
+      return list.length > 100 ? list.sublist(0, 100) : list;
+    }
+    return await db!.query(
       'notifications',
       where: 'user_id = ?',
       whereArgs: [userId],
@@ -772,22 +937,44 @@ class LocalBackendService {
 
   static Future<void> markNotificationRead(String notificationId) async {
     final db = await database;
-    await db.update(
-      'notifications',
-      {'is_read': 1},
-      where: 'id = ?',
-      whereArgs: [notificationId],
-    );
+    if (kIsWeb) {
+      final list = _webStorage['notifications']!;
+      for (var i = 0; i < list.length; i++) {
+        if (list[i]['id'] == notificationId) {
+          final copy = Map<String, dynamic>.from(list[i]);
+          copy['is_read'] = 1;
+          list[i] = copy;
+        }
+      }
+    } else {
+      await db!.update(
+        'notifications',
+        {'is_read': 1},
+        where: 'id = ?',
+        whereArgs: [notificationId],
+      );
+    }
   }
 
   static Future<void> markAllNotificationsRead(String userId) async {
     final db = await database;
-    await db.update(
-      'notifications',
-      {'is_read': 1},
-      where: 'user_id = ? AND is_read = 0',
-      whereArgs: [userId],
-    );
+    if (kIsWeb) {
+      final list = _webStorage['notifications']!;
+      for (var i = 0; i < list.length; i++) {
+        if (list[i]['user_id'] == userId && list[i]['is_read'] == 0) {
+          final copy = Map<String, dynamic>.from(list[i]);
+          copy['is_read'] = 1;
+          list[i] = copy;
+        }
+      }
+    } else {
+      await db!.update(
+        'notifications',
+        {'is_read': 1},
+        where: 'user_id = ? AND is_read = 0',
+        whereArgs: [userId],
+      );
+    }
   }
 
   // ─── Expenses ───
@@ -821,14 +1008,25 @@ class LocalBackendService {
       'created_at': now.toIso8601String(),
     };
 
-    await db.insert('expenses', data);
+    if (kIsWeb) {
+      _webStorage['expenses']!.add(data);
+    } else {
+      await db!.insert('expenses', data);
+    }
     return data;
   }
 
   static Future<List<Map<String, dynamic>>> getExpenses(
       String tripId) async {
     final db = await database;
-    return await db.query(
+    if (kIsWeb) {
+      final list = _webStorage['expenses']!
+          .where((e) => e['trip_id'] == tripId)
+          .toList();
+      list.sort((a, b) => b['created_at'].toString().compareTo(a['created_at'].toString()));
+      return list;
+    }
+    return await db!.query(
       'expenses',
       where: 'trip_id = ?',
       whereArgs: [tripId],
@@ -838,7 +1036,11 @@ class LocalBackendService {
 
   static Future<bool> deleteExpense(String expenseId) async {
     final db = await database;
-    final count = await db.delete(
+    if (kIsWeb) {
+      _webStorage['expenses']!.removeWhere((e) => e['id'] == expenseId);
+      return true;
+    }
+    final count = await db!.delete(
       'expenses',
       where: 'id = ?',
       whereArgs: [expenseId],
@@ -857,7 +1059,7 @@ class LocalBackendService {
     String? destination,
   }) async {
     final db = await database;
-    await db.insert('emergency_contacts', {
+    final row = {
       'id': _uuid.v4(),
       'user_id': userId,
       'name': name,
@@ -866,13 +1068,26 @@ class LocalBackendService {
       'is_local_service': isLocalService ? 1 : 0,
       'destination': destination,
       'created_at': DateTime.now().toIso8601String(),
-    });
+    };
+
+    if (kIsWeb) {
+      _webStorage['emergency_contacts']!.add(row);
+    } else {
+      await db!.insert('emergency_contacts', row);
+    }
   }
 
   static Future<List<Map<String, dynamic>>> getEmergencyContacts(
       String userId) async {
     final db = await database;
-    return await db.query(
+    if (kIsWeb) {
+      final list = _webStorage['emergency_contacts']!
+          .where((c) => c['user_id'] == userId)
+          .toList();
+      list.sort((a, b) => (b['is_local_service'] as int).compareTo(a['is_local_service'] as int));
+      return list;
+    }
+    return await db!.query(
       'emergency_contacts',
       where: 'user_id = ?',
       whereArgs: [userId],
@@ -882,7 +1097,11 @@ class LocalBackendService {
 
   static Future<bool> deleteEmergencyContact(String contactId) async {
     final db = await database;
-    final count = await db.delete(
+    if (kIsWeb) {
+      _webStorage['emergency_contacts']!.removeWhere((c) => c['id'] == contactId);
+      return true;
+    }
+    final count = await db!.delete(
       'emergency_contacts',
       where: 'id = ?',
       whereArgs: [contactId],
@@ -894,14 +1113,18 @@ class LocalBackendService {
 
   static Future<void> resetState() async {
     final db = await database;
-    await db.delete('chat_messages');
-    await db.delete('community_updates');
-    await db.delete('favorites');
-    await db.delete('saved_itineraries');
-    await db.delete('user_stats');
-    await db.delete('expenses');
-    await db.delete('notifications');
-    await db.delete('emergency_contacts');
+    if (kIsWeb) {
+      _webStorage.forEach((key, list) => list.clear());
+    } else {
+      await db!.delete('chat_messages');
+      await db!.delete('community_updates');
+      await db!.delete('favorites');
+      await db!.delete('saved_itineraries');
+      await db!.delete('user_stats');
+      await db!.delete('expenses');
+      await db!.delete('notifications');
+      await db!.delete('emergency_contacts');
+    }
     // Reseed demo user
     await _seedDemoUser(db);
   }
