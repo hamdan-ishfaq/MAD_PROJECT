@@ -17,7 +17,6 @@ import 'package:tripgenie/features/settings/screens/settings_screen.dart';
 import 'package:tripgenie/features/notifications/screens/notifications_screen.dart';
 import 'package:tripgenie/features/emergency/screens/emergency_contacts_screen.dart';
 import 'package:tripgenie/features/social/widgets/community_updates_sheet.dart';
-import 'package:tripgenie/features/expenses/screens/expense_tracker_screen.dart';
 import 'package:tripgenie/core/services/api_service.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -475,15 +474,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 borderColor: borderColor,
                 theme: theme,
                 child: Column(children: [
-                  ListTile(
-                    leading: const Icon(Icons.account_balance_wallet_outlined, color: AppColors.accent),
-                    title: const Text('Expense Tracker'),
-                    subtitle: Text('Track trip expenses', style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
-                    trailing: Icon(Icons.chevron_right, color: theme.colorScheme.outline),
-                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) => const ExpenseTrackerScreen(tripId: 'personal', tripName: 'My Expenses'),
-                    )),
-                  ),
                   ListTile(
                     leading: const Icon(Icons.emergency, color: Colors.red),
                     title: const Text('Emergency Contacts'),

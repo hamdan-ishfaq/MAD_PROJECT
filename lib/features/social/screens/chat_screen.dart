@@ -11,7 +11,6 @@ import 'package:tripgenie/core/services/local_chat_service.dart';
 import 'package:tripgenie/core/services/notification_service.dart';
 import 'package:tripgenie/features/social/models/trip_model.dart';
 import 'package:tripgenie/core/services/ai_service.dart';
-import 'package:tripgenie/features/expenses/screens/expense_tracker_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   final TripPost trip;
@@ -342,17 +341,12 @@ class _ChatScreenState extends State<ChatScreen> {
                 _showLanguageKitDialog();
               } else if (v == 'diary') {
                 _showDiaryDialog();
-              } else if (v == 'expenses') {
-                Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => ExpenseTrackerScreen(tripId: widget.trip.id, tripName: widget.trip.destination),
-                ));
               }
             },
             itemBuilder: (_) => [
               const PopupMenuItem(value: 'packing', child: ListTile(leading: Icon(Icons.inventory_2_outlined), title: Text('AI Packing List'), dense: true)),
               const PopupMenuItem(value: 'language', child: ListTile(leading: Icon(Icons.translate), title: Text('Language Kit'), dense: true)),
               const PopupMenuItem(value: 'diary', child: ListTile(leading: Icon(Icons.book_outlined), title: Text('Trip Diary'), dense: true)),
-              const PopupMenuItem(value: 'expenses', child: ListTile(leading: Icon(Icons.receipt_long_outlined), title: Text('Expenses'), dense: true)),
               const PopupMenuItem(value: 'leave', child: ListTile(leading: Icon(Icons.logout, color: Colors.red), title: Text('Leave Room', style: TextStyle(color: Colors.red)), dense: true)),
             ],
             icon: const Icon(Icons.more_vert, color: AppColors.textPrimary),
