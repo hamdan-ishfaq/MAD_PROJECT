@@ -4,6 +4,7 @@ import 'package:tripgenie/core/constants/app_colors.dart';
 import 'package:tripgenie/core/services/auth_service.dart';
 import 'package:tripgenie/core/services/app_data_reset_service.dart';
 import 'package:tripgenie/features/onboarding/screens/onboarding_screen.dart';
+import 'package:tripgenie/main.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -40,9 +41,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white, elevation: 0,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor, elevation: 0,
         title: const Text('Settings', style: TextStyle(fontWeight: FontWeight.w700)),
       ),
       body: ListView(
@@ -64,7 +65,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             trailing: Switch(
               value: _darkMode,
               activeColor: AppColors.primary,
-              onChanged: (v) { setState(() => _darkMode = v); _savePreference('dark_mode', v); },
+              onChanged: (v) { 
+                setState(() => _darkMode = v); 
+                _savePreference('dark_mode', v); 
+                themeNotifier.value = v ? ThemeMode.dark : ThemeMode.light;
+              },
             ),
           ),
           const SizedBox(height: 24),
@@ -125,7 +130,7 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 8),
-    child: Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
+    child: Text(title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.onSurfaceVariant)),
   );
 }
 
@@ -146,8 +151,8 @@ class _SettingsTile extends StatelessWidget {
       child: ListTile(
         leading: Icon(icon, color: AppColors.primary),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-        subtitle: subtitle.isNotEmpty ? Text(subtitle, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)) : null,
-        trailing: trailing ?? (onTap != null ? const Icon(Icons.chevron_right, color: AppColors.textHint) : null),
+        subtitle: subtitle.isNotEmpty ? Text(subtitle, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)) : null,
+        trailing: trailing ?? (onTap != null ? Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.outline) : null),
         onTap: onTap,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),

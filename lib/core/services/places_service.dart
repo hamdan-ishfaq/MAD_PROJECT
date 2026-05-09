@@ -5,14 +5,28 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:tripgenie/core/models/place_model.dart';
 import 'package:tripgenie/core/services/api_service.dart';
 
+class _CacheEntry {
+  final dynamic data;
+  final DateTime timestamp;
+  _CacheEntry(this.data) : timestamp = DateTime.now();
+  bool get isExpired => DateTime.now().difference(timestamp).inMinutes > 30; // 30 mins cache
+}
+
 /// Service for fetching place details from OpenTripMap API.
 /// Nearby places and trending data now come from ApiService fallback data.
 class PlacesService {
-  static const String _opentripmapBase = 'https://api.opentripmap.com/0.2';
-  static final String _opentripmapKey = dotenv.env['OPENTRIPMAP_KEY'] ?? '';
+  static const String _opentripmapBase = 'https://api.opentripmap.com/0.1';
+  static String get _opentripmapKey => dotenv.env['OPENTRIPMAP_KEY'] ?? '';
   
+  static final Map<String, _CacheEntry> _cache = {};
+
   // Get place details by ID (from OpenTripMap)
   static Future<Place?> getPlaceDetails(String xid) async {
+    final cacheKey = 'details_$xid';
+    if (_cache.containsKey(cacheKey) && !_cache[cacheKey]!.isExpired) {
+      return _cache[cacheKey]!.data as Place?;
+    }
+
     try {
       final response = await http.get(
         Uri.parse('$_opentripmapBase/en/places/xid/$xid?apikey=$_opentripmapKey'),
@@ -20,7 +34,9 @@ class PlacesService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return _parsePlaceFromDetail(data);
+        final place = _parsePlaceFromDetail(data);
+        if (place != null) _cache[cacheKey] = _CacheEntry(place);
+        return place;
       }
       return null;
     } catch (e) {
@@ -31,6 +47,11 @@ class PlacesService {
   // Search places by query (from OpenTripMap)
   static Future<List<Place>> searchPlaces(String query) async {
     if (query.isEmpty || _opentripmapKey.isEmpty) return [];
+
+    final cacheKey = 'search_$query';
+    if (_cache.containsKey(cacheKey) && !_cache[cacheKey]!.isExpired) {
+      return _cache[cacheKey]!.data as List<Place>;
+    }
 
     try {
       // Get geoname first
@@ -46,21 +67,9 @@ class PlacesService {
 
       if (lat == null || lon == null) return [];
 
-      // Get places near that location
-      final placesResponse = await http.get(
-        Uri.parse('$_opentripmapBase/en/places/radius?radius=5000&lon=$lon&lat=$lat&limit=20&apikey=$_opentripmapKey'),
-      ).timeout(const Duration(seconds: 10));
-
-      if (placesResponse.statusCode != 200) return [];
-
-      final features = jsonDecode(placesResponse.body)['features'] as List?;
-      if (features == null) return [];
-
-      final places = <Place>[];
-      for (final feature in features.take(10)) {
-        final place = await _fetchPlaceDetails(feature);
-        if (place != null) places.add(place);
-      }
+      // Get places near that location directly
+      final places = await getNearbyPlaces(latitude: lat, longitude: lon, radius: 20000, limit: 50);
+      _cache[cacheKey] = _CacheEntry(places);
       return places;
     } catch (e) {
       return [];
@@ -73,12 +82,19 @@ class PlacesService {
       final xid = feature['properties']?['xid'];
       if (xid == null) return null;
 
+      final cacheKey = 'details_$xid';
+      if (_cache.containsKey(cacheKey) && !_cache[cacheKey]!.isExpired) {
+        return _cache[cacheKey]!.data as Place?;
+      }
+
       final response = await http.get(
         Uri.parse('$_opentripmapBase/en/places/xid/$xid?apikey=$_opentripmapKey'),
       ).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
-        return _parsePlaceFromDetail(jsonDecode(response.body));
+        final place = _parsePlaceFromDetail(jsonDecode(response.body));
+        if (place != null) _cache[cacheKey] = _CacheEntry(place);
+        return place;
       }
       return null;
     } catch (e) {
@@ -94,40 +110,54 @@ class PlacesService {
     int radius = 8000,
     int limit = 50, // OTM gives a lot of places, limit to 50 for UI performance
   }) async {
+    final cacheKey = 'nearby_${latitude}_${longitude}_${category}_${radius}_${limit}';
+    if (_cache.containsKey(cacheKey) && !_cache[cacheKey]!.isExpired) {
+      return _cache[cacheKey]!.data as List<Place>;
+    }
+
     if (_opentripmapKey.isNotEmpty) {
       try {
-        String kinds = 'interesting_places';
+        String kinds = 'interesting_places%2Cfoods%2Cshops%2Caccomodations';
         if (category != null && category != 'All') {
           switch (category.toLowerCase()) {
             case 'food': kinds = 'foods'; break;
-            case 'parks': kinds = 'natural,urban_environment'; break;
+            case 'parks': kinds = 'natural%2Curban_environment'; break;
             case 'shopping': kinds = 'shops'; break;
-            case 'hotels': kinds = 'accommodations'; break;
-            case 'culture': kinds = 'cultural,religion,historic'; break;
+            case 'hotels': kinds = 'accomodations'; break;
+            case 'culture': kinds = 'cultural%2Creligion%2Chistoric'; break;
           }
         }
 
         final url = Uri.parse(
-            '$_opentripmapBase/en/places/radius?radius=$radius&lon=$longitude&lat=$latitude&kinds=$kinds&rate=2&format=json&limit=$limit&apikey=$_opentripmapKey');
+            '$_opentripmapBase/en/places/radius?radius=$radius&lon=$longitude&lat=$latitude&kinds=$kinds&rate=1&format=json&limit=$limit&apikey=$_opentripmapKey');
         
+        debugPrint('Fetching places: $url');
         final response = await http.get(url).timeout(const Duration(seconds: 10));
         
         if (response.statusCode == 200) {
           final List<dynamic> data = jsonDecode(response.body);
           final places = data.where((p) => p['name'] != null && p['name'].toString().isNotEmpty).map((p) {
-            // OTM rate is usually 1-7. Map to a 3.0-5.0 scale for realism.
             double rateVal = (p['rate'] as num?)?.toDouble() ?? 1.0;
             double rating = 3.0 + (rateVal / 7.0) * 2.0; 
             
+            String apiKinds = p['kinds']?.toString() ?? '';
+            String finalCategory = 'Attraction';
+            if (apiKinds.contains('foods') || apiKinds.contains('restaurants')) finalCategory = 'Food';
+            else if (apiKinds.contains('shops') || apiKinds.contains('malls')) finalCategory = 'Shopping';
+            else if (apiKinds.contains('accommodations') || apiKinds.contains('hotels')) finalCategory = 'Hotels';
+            else if (apiKinds.contains('natural') || apiKinds.contains('urban_environment')) finalCategory = 'Parks';
+            else if (apiKinds.contains('cultural') || apiKinds.contains('religion') || apiKinds.contains('historic')) finalCategory = 'Culture';
+            else if (category != null && category != 'All') finalCategory = category;
+
             return Place(
               id: p['xid'] ?? p['id']?.toString() ?? '',
               name: p['name'] ?? 'Unknown',
               latitude: (p['point']?['lat'] as num?)?.toDouble() ?? 0.0,
               longitude: (p['point']?['lon'] as num?)?.toDouble() ?? 0.0,
-              category: p['kinds']?.split(',').first ?? category ?? 'attraction',
-              crowdLevel: (rateVal / 7.0), // Popular places might be more crowded
+              category: finalCategory,
+              crowdLevel: (rateVal / 7.0),
               rating: double.parse(rating.toStringAsFixed(1)),
-              reviewCount: (rateVal * 42).toInt(), // Mock review count based on popularity
+              reviewCount: (rateVal * 42).toInt(),
               photos: [],
               reviews: [],
               description: '',
@@ -138,27 +168,41 @@ class PlacesService {
             );
           }).toList();
 
-          if (places.isNotEmpty) return places;
+          debugPrint('OpenTripMap found ${places.length} places.');
+          // If API succeeded, we return the places (even if empty) to avoid jumping to static Islamabad data.
+          _cache[cacheKey] = _CacheEntry(places);
+          return places;
+        } else {
+          debugPrint('OpenTripMap returned status ${response.statusCode}');
         }
       } catch (e) {
-        debugPrint("OpenTripMap fetch failed: \$e. Falling back to mock data.");
+        debugPrint("OpenTripMap fetch failed: $e. Falling back to mock data.");
       }
     }
 
-    // Fallback to ApiService mock data
-    final dynamicData = await ApiService.getNearbyPlaces(
-      latitude: latitude,
-      longitude: longitude,
-      category: category,
-      radius: radius,
-      limit: limit,
-    );
-    return dynamicData.map((e) => Place.fromJson(e as Map<String, dynamic>)).toList();
+    // If API key is missing or OTM fails, use the internal static fallback
+    if (category != null && category.isNotEmpty && category != 'All') {
+      final res = ApiService.fallbackPlaces
+          .where((p) => (p['category'] as String).toLowerCase() == category.toLowerCase())
+          .map((e) => Place.fromJson(e as Map<String, dynamic>)).toList();
+      _cache[cacheKey] = _CacheEntry(res);
+      return res;
+    }
+    final fallbackRes = ApiService.fallbackPlaces.map((e) => Place.fromJson(e as Map<String, dynamic>)).toList();
+    _cache[cacheKey] = _CacheEntry(fallbackRes);
+    return fallbackRes;
   }
 
   static Future<List<Place>> getTrendingPlaces({int limit = 10}) async {
+    final cacheKey = 'trending_$limit';
+    if (_cache.containsKey(cacheKey) && !_cache[cacheKey]!.isExpired) {
+      return _cache[cacheKey]!.data as List<Place>;
+    }
+
     final dynamicData = await ApiService.getTrendingPlaces(limit: limit);
-    return dynamicData.map((e) => Place.fromJson(e as Map<String, dynamic>)).toList();
+    final places = dynamicData.map((e) => Place.fromJson(e as Map<String, dynamic>)).toList();
+    _cache[cacheKey] = _CacheEntry(places);
+    return places;
   }
 
   // Helper: Parse place from API response
@@ -169,7 +213,7 @@ class PlacesService {
         name: data['name'] ?? 'Unknown',
         latitude: (data['point']?['lat'] as num?)?.toDouble() ?? 0.0,
         longitude: (data['point']?['lon'] as num?)?.toDouble() ?? 0.0,
-        category: data['kinds']?.split(',').first ?? 'attraction',
+        category: _parseCategoryFromKinds(data['kinds']),
         crowdLevel: 0,
         rating: (data['rate'] as num?)?.toDouble() ?? 0.0,
         reviewCount: data['reviews']?.length ?? 0,
@@ -188,5 +232,16 @@ class PlacesService {
     } catch (e) {
       return null;
     }
+  }
+
+  // Helper: Extract category
+  static String _parseCategoryFromKinds(dynamic kindsObj) {
+    String apiKinds = kindsObj?.toString() ?? '';
+    if (apiKinds.contains('foods') || apiKinds.contains('restaurants')) return 'Food';
+    if (apiKinds.contains('shops') || apiKinds.contains('malls')) return 'Shopping';
+    if (apiKinds.contains('accommodations') || apiKinds.contains('hotels')) return 'Hotels';
+    if (apiKinds.contains('natural') || apiKinds.contains('urban_environment')) return 'Parks';
+    if (apiKinds.contains('cultural') || apiKinds.contains('religion') || apiKinds.contains('historic')) return 'Culture';
+    return 'Attraction';
   }
 }

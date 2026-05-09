@@ -7,6 +7,10 @@ import 'package:tripgenie/core/routes/app_routes.dart';
 import 'package:tripgenie/core/services/app_data_reset_service.dart';
 import 'package:tripgenie/core/services/notification_service.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
+final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.system);
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -35,6 +39,13 @@ void main() async {
   // Initialize local notifications
   await NotificationService.initialize();
 
+  // Load saved theme preference
+  final prefs = await SharedPreferences.getInstance();
+  final isDark = prefs.getBool('dark_mode');
+  if (isDark != null) {
+    themeNotifier.value = isDark ? ThemeMode.dark : ThemeMode.light;
+  }
+
   runApp(const WanderlandApp());
 }
 
@@ -43,13 +54,18 @@ class WanderlandApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      title: 'Wanderland',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system,
-      routerConfig: AppRoutes.router,
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeNotifier,
+      builder: (_, ThemeMode currentMode, __) {
+        return MaterialApp.router(
+          title: 'Wanderland',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: currentMode,
+          routerConfig: AppRoutes.router,
+        );
+      },
     );
   }
 }

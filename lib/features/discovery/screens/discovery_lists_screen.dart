@@ -17,7 +17,7 @@ class _DiscoveryListsScreenState extends State<DiscoveryListsScreen> {
   @override
   void initState() {
     super.initState();
-    _trendingFuture = PlacesService.getTrendingPlaces();
+    _trendingFuture = PlacesService.searchPlaces(widget.city);
   }
 
   @override

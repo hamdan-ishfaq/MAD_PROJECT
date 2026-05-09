@@ -19,7 +19,7 @@ class AttractionsExplorerScreen extends StatefulWidget {
 class _AttractionsExplorerScreenState extends State<AttractionsExplorerScreen> {
   late Future<List<Place>> _placesFuture;
   String? _selectedCategory;
-  final List<String> _categories = ['attractions', 'restaurants', 'hotels', 'parks'];
+  final List<String> _categories = ['Culture', 'Food', 'Parks', 'Shopping', 'Hotels'];
 
   @override
   void initState() {
@@ -71,7 +71,7 @@ class _AttractionsExplorerScreenState extends State<AttractionsExplorerScreen> {
                 return Padding(
                   padding: const EdgeInsets.only(right: 8.0),
                   child: ChoiceChip(
-                    label: Text(category[0].toUpperCase() + category.substring(1)),
+                    label: Text(category),
                     selected: _selectedCategory == category,
                     onSelected: (selected) {
                       _selectedCategory = selected ? category : null;
