@@ -266,17 +266,17 @@ class _PostTripScreenState extends State<PostTripScreen> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
-                      color: selected ? AppColors.primary : Colors.white,
+                      color: selected ? AppColors.primary : Theme.of(context).colorScheme.surface,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                           color: selected
                               ? AppColors.primary
-                              : Colors.grey.shade300),
+                              : Theme.of(context).dividerColor),
                     ),
                     child: Text(label,
                         style: TextStyle(
                             color:
-                                selected ? Colors.white : Colors.grey.shade700,
+                                selected ? Colors.white : Theme.of(context).colorScheme.onSurfaceVariant,
                             fontWeight:
                                 selected ? FontWeight.w600 : FontWeight.w400,
                             fontSize: 13)),
@@ -297,13 +297,13 @@ class _PostTripScreenState extends State<PostTripScreen> {
                 hintText:
                     'Tell others what you\'re planning, your travel style, budget range…',
                 filled: true,
-                fillColor: Colors.white,
+                fillColor: Theme.of(context).colorScheme.surface,
                 border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.shade300)),
+                    borderSide: BorderSide(color: Theme.of(context).dividerColor)),
                 enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.shade300)),
+                    borderSide: BorderSide(color: Theme.of(context).dividerColor)),
                 focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide:
@@ -371,13 +371,13 @@ class _Field extends StatelessWidget {
         hintText: hint,
         prefixIcon: Icon(prefix, color: AppColors.primary, size: 20),
         filled: true,
-        fillColor: Colors.white,
+        fillColor: Theme.of(context).colorScheme.surface,
         border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey.shade300)),
+            borderSide: BorderSide(color: Theme.of(context).dividerColor)),
         enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey.shade300)),
+            borderSide: BorderSide(color: Theme.of(context).dividerColor)),
         focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: const BorderSide(color: AppColors.primary, width: 2)),
@@ -403,13 +403,13 @@ class _TapField extends StatelessWidget {
         prefixIcon: const Icon(Icons.calendar_today_outlined,
             color: AppColors.primary, size: 18),
         filled: true,
-        fillColor: Colors.white,
+        fillColor: Theme.of(context).colorScheme.surface,
         border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey.shade300)),
+            borderSide: BorderSide(color: Theme.of(context).dividerColor)),
         enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey.shade300)),
+            borderSide: BorderSide(color: Theme.of(context).dividerColor)),
         focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: const BorderSide(color: AppColors.primary, width: 2)),

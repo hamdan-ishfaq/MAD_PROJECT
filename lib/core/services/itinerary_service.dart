@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:tripgenie/features/planner/models/itinerary_model.dart';
+import 'package:tripgenie/core/services/weather_service.dart';
 
 // ItineraryService powered by Groq Cloud
 class ItineraryService {
@@ -68,7 +70,7 @@ class ItineraryService {
           .timeout(const Duration(seconds: 45));
 
       if (response.statusCode != 200) {
-        print(
+        debugPrint(
             '[ItineraryService] JSON repair call failed: ${response.statusCode}');
         return null;
       }
@@ -78,7 +80,7 @@ class ItineraryService {
           (data['choices'][0]['message']['content'] as String?) ?? '';
       return _tryParseModelJson(repairedText);
     } catch (e) {
-      print('[ItineraryService] JSON repair exception: $e');
+      debugPrint('[ItineraryService] JSON repair exception: $e');
       return null;
     }
   }
@@ -92,12 +94,23 @@ class ItineraryService {
   }) async {
     final interestsStr = interests.join(', ');
     final secondaryInterestsStr = secondaryInterests.join(', ');
+    
+    // Fetch weather forecasts
+    final weatherForecasts = await WeatherService.getDailyForecasts(destination, days);
+    
+    // Build day-by-day instructions
+    String weatherContext = "Weather forecast for the trip:\\n";
+    for (int i = 0; i < days; i++) {
+      weatherContext += "Day ${i+1}: ${weatherForecasts[i]}\\n";
+    }
 
     final prompt = '''
 You are an expert travel planner. Generate a detailed $days-day itinerary for $destination.
 Total budget: \$${budget.round()} USD.
 Traveler interests: $interestsStr.
 Secondary user profile interests (use only as optional suggestions if relevant): ${secondaryInterestsStr.isEmpty ? 'None' : secondaryInterestsStr}.
+
+$weatherContext
 
 IMPORTANT: Respond ONLY with a valid JSON object. No explanation, no markdown, no code blocks.
 Use exactly this structure:
@@ -111,11 +124,12 @@ Use exactly this structure:
     {
       "day": 1,
       "date": "Day 1",
+      "weather": "Write the provided weather forecast for this day exactly as given, or 'Too soon to predict'",
       "activities": [
         {
           "time": "9:00 AM",
           "title": "Name of place or activity",
-          "description": "2 sentence description with practical tips",
+          "description": "2 sentence description with practical tips, optionally referencing the weather if appropriate",
           "type": "culture"
         }
       ]
@@ -134,11 +148,11 @@ Rules:
     try {
       // Debug: verify key is loaded
       if (_apiKey.isEmpty) {
-        print(
+        debugPrint(
             '[ItineraryService] ERROR: GROQ_API_KEY is empty! Make sure .env is loaded and contains GROQ_API_KEY');
         return null;
       }
-      print(
+      debugPrint(
           '[ItineraryService] API key loaded (${_apiKey.substring(0, 8)}...), calling Groq...');
 
       // Use a small retry loop to handle transient network errors (Connection
@@ -171,11 +185,11 @@ Rules:
               )
               .timeout(const Duration(seconds: 60));
 
-          print(
+          debugPrint(
               '[ItineraryService] Response status: ${response.statusCode} (attempt $attempt)');
           break; // success or server error; exit retry loop and handle below
         } catch (e) {
-          print('[ItineraryService] Request attempt $attempt failed: $e');
+          debugPrint('[ItineraryService] Request attempt $attempt failed: $e');
           if (attempt == maxAttempts) rethrow;
           // exponential backoff before retrying
           await Future.delayed(Duration(milliseconds: 500 * attempt));
@@ -183,7 +197,7 @@ Rules:
       }
 
       if (response == null) {
-        print('[ItineraryService] No response received from Groq API');
+        debugPrint('[ItineraryService] No response received from Groq API');
         return null;
       }
 
@@ -193,27 +207,27 @@ Rules:
 
         var itineraryJson = _tryParseModelJson(rawText);
         if (itineraryJson == null) {
-          print(
+          debugPrint(
               '[ItineraryService] Received malformed JSON, trying repair pass...');
           itineraryJson = await _repairJsonWithGroq(rawText);
         }
 
         if (itineraryJson == null) {
-          print(
+          debugPrint(
               '[ItineraryService] Could not parse or repair Groq JSON response');
           return null;
         }
 
-        print(
+        debugPrint(
             '[ItineraryService] Successfully parsed itinerary for $destination');
         return Itinerary.fromJson(itineraryJson);
       } else {
-        print(
+        debugPrint(
             '[ItineraryService] Groq API error ${response.statusCode}: ${response.body}');
       }
     } catch (e, stackTrace) {
-      print('[ItineraryService] Exception: $e');
-      print('[ItineraryService] Stack: $stackTrace');
+      debugPrint('[ItineraryService] Exception: $e');
+      debugPrint('[ItineraryService] Stack: $stackTrace');
     }
     return null;
   }

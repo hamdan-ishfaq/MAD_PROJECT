@@ -163,16 +163,16 @@ class _PlannerScreenState extends State<PlannerScreen> {
                     color: AppColors.primary),
                 border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.shade300)),
+                    borderSide: BorderSide(color: theme.dividerColor)),
                 enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.shade300)),
+                    borderSide: BorderSide(color: theme.dividerColor)),
                 focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide:
                         const BorderSide(color: AppColors.primary, width: 2)),
                 filled: true,
-                fillColor: Colors.white,
+                fillColor: theme.colorScheme.surface,
               ),
             ),
 
@@ -263,9 +263,9 @@ class _PlannerScreenState extends State<PlannerScreen> {
                           border: Border.all(color: AppColors.border),
                         ),
                         child: Text(item,
-                            style: const TextStyle(
+                            style: TextStyle(
                                 fontSize: 12,
-                                color: AppColors.textSecondary,
+                                color: theme.colorScheme.onSurfaceVariant,
                                 fontWeight: FontWeight.w500)),
                       ),
                     )
@@ -301,12 +301,12 @@ class _PlannerScreenState extends State<PlannerScreen> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
-                      color: selected ? AppColors.primary : Colors.white,
+                      color: selected ? AppColors.primary : theme.colorScheme.surface,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                           color: selected
                               ? AppColors.primary
-                              : Colors.grey.shade300),
+                              : theme.dividerColor),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -314,13 +314,13 @@ class _PlannerScreenState extends State<PlannerScreen> {
                         Icon(icon,
                             size: 15,
                             color:
-                                selected ? Colors.white : Colors.grey.shade600),
+                                selected ? Colors.white : theme.colorScheme.onSurfaceVariant),
                         const SizedBox(width: 6),
                         Text(label,
                             style: TextStyle(
                                 color: selected
                                     ? Colors.white
-                                    : Colors.grey.shade700,
+                                    : theme.colorScheme.onSurfaceVariant,
                                 fontWeight: selected
                                     ? FontWeight.w600
                                     : FontWeight.w400,

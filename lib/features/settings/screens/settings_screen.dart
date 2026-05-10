@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tripgenie/core/constants/app_colors.dart';
-import 'package:tripgenie/core/services/auth_service.dart';
+import 'package:tripgenie/core/routes/app_routes.dart';
+import 'package:tripgenie/core/services/auth_api_service.dart';
 import 'package:tripgenie/core/services/app_data_reset_service.dart';
 import 'package:tripgenie/features/onboarding/screens/onboarding_screen.dart';
 import 'package:tripgenie/main.dart';
@@ -112,8 +114,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Center(
             child: TextButton(
               onPressed: () async {
-                await AuthService.clearUser();
-                if (mounted) Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+                await AuthApiService.logout();
+                if (mounted) context.go(AppRoutes.login);
               },
               child: const Text('Sign Out', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
             ),
@@ -147,7 +149,7 @@ class _SettingsTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(12)),
       child: ListTile(
         leading: Icon(icon, color: AppColors.primary),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),

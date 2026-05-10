@@ -23,111 +23,6 @@ class ItineraryResultScreen extends StatefulWidget {
 
 class _ItineraryResultScreenState extends State<ItineraryResultScreen> {
   bool _isSaving = false;
-  bool _isLoadingWeather = true;
-  String? _weatherSummary;
-  String? _weatherError;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchWeather();
-  }
-
-  Future<void> _fetchWeather() async {
-    try {
-      final coordinates =
-          await _resolveCoordinates(widget.itinerary.destination);
-      if (coordinates == null) {
-        if (!mounted) return;
-        setState(() {
-          _weatherError = 'Weather unavailable for this destination.';
-          _isLoadingWeather = false;
-        });
-        return;
-      }
-
-      final uri = Uri.parse(
-        'https://api.open-meteo.com/v1/forecast?latitude=${coordinates['lat']}&longitude=${coordinates['lng']}&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto',
-      );
-      final response = await http.get(uri).timeout(const Duration(seconds: 10));
-      if (response.statusCode != 200) {
-        throw Exception('Open-Meteo request failed');
-      }
-
-      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-      final daily = decoded['daily'] as Map<String, dynamic>?;
-      final temperaturesMax = (daily?['temperature_2m_max'] as List<dynamic>?);
-      final temperaturesMin = (daily?['temperature_2m_min'] as List<dynamic>?);
-      final weatherCodes = (daily?['weather_code'] as List<dynamic>?);
-
-      final summary = _buildWeatherSummary(
-        _firstNumberValue(weatherCodes)?.toInt(),
-        _firstNumberValue(temperaturesMax)?.toDouble(),
-        _firstNumberValue(temperaturesMin)?.toDouble(),
-      );
-
-      if (!mounted) return;
-      setState(() {
-        _weatherSummary = summary;
-        _isLoadingWeather = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _weatherError = 'Weather unavailable right now.';
-        _isLoadingWeather = false;
-      });
-    }
-  }
-
-  Future<Map<String, double>?> _resolveCoordinates(String destination) async {
-    final uri = Uri.parse(
-      'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${Uri.encodeComponent(destination)}',
-    );
-    final response = await http.get(uri, headers: {
-      'User-Agent': 'wanderland-app'
-    }).timeout(const Duration(seconds: 10));
-
-    if (response.statusCode != 200) return null;
-
-    final decoded = jsonDecode(response.body);
-    if (decoded is! List || decoded.isEmpty) return null;
-
-    final first = decoded.first as Map<String, dynamic>;
-    final latitude = double.tryParse(first['lat']?.toString() ?? '');
-    final longitude = double.tryParse(first['lon']?.toString() ?? '');
-    if (latitude == null || longitude == null) return null;
-
-    return {'lat': latitude, 'lng': longitude};
-  }
-
-  num? _firstNumberValue(List<dynamic>? values) {
-    if (values == null || values.isEmpty) return null;
-    final first = values.first;
-    return first is num ? first : num.tryParse(first.toString());
-  }
-
-  String _buildWeatherSummary(
-      int? weatherCode, double? maxTemp, double? minTemp) {
-    final description = switch (weatherCode) {
-      0 => 'Clear sky',
-      1 || 2 => 'Partly cloudy',
-      3 => 'Cloudy',
-      45 || 48 => 'Foggy',
-      51 || 53 || 55 => 'Drizzle',
-      61 || 63 || 65 => 'Rain',
-      71 || 73 || 75 => 'Snow',
-      80 || 81 || 82 => 'Showers',
-      95 || 96 || 99 => 'Thunderstorm',
-      _ => 'Forecast available',
-    };
-
-    final tempText = maxTemp != null && minTemp != null
-        ? '${maxTemp.toStringAsFixed(0)}° / ${minTemp.toStringAsFixed(0)}°'
-        : 'Temperature unavailable';
-
-    return '$description • $tempText';
-  }
 
   Future<void> _saveItinerary() async {
     if (_isSaving) return;
@@ -153,8 +48,8 @@ class _ItineraryResultScreenState extends State<ItineraryResultScreen> {
       'day_plans': widget.itinerary.dayPlans
           .map(
             (dayPlan) => {
-              'day': dayPlan.day,
               'date': dayPlan.date,
+              'weather': dayPlan.weather,
               'activities': dayPlan.activities
                   .map(
                     (activity) => {
@@ -244,9 +139,9 @@ class _ItineraryResultScreenState extends State<ItineraryResultScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: theme.colorScheme.surface,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade200),
+                border: Border.all(color: theme.dividerColor),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -270,28 +165,6 @@ class _ItineraryResultScreenState extends State<ItineraryResultScreen> {
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Weather',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade200),
-              ),
-              child: _isLoadingWeather
-                  ? const Center(child: CircularProgressIndicator())
-                  : Text(_weatherSummary ??
-                      _weatherError ??
-                      'Weather unavailable.'),
             ),
             const SizedBox(height: 16),
             Text(
@@ -356,9 +229,9 @@ class _DayPlanCardState extends State<_DayPlanCard> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         children: [
@@ -373,12 +246,31 @@ class _DayPlanCardState extends State<_DayPlanCard> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Day ${widget.dayPlan.day}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Day ${widget.dayPlan.day}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(Icons.wb_sunny_outlined, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                          const SizedBox(width: 4),
+                          Text(
+                            widget.dayPlan.weather,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                   Icon(
                     _isExpanded
@@ -394,7 +286,7 @@ class _DayPlanCardState extends State<_DayPlanCard> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: Colors.grey.shade50,
+                color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
                 borderRadius: const BorderRadius.only(
                   bottomLeft: Radius.circular(12),
                   bottomRight: Radius.circular(12),
@@ -453,7 +345,7 @@ class _DayPlanCardState extends State<_DayPlanCard> {
                                 activity.description,
                                 style: TextStyle(
                                   fontSize: 13,
-                                  color: Colors.grey.shade700,
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                                 ),
                               ),
                             ),

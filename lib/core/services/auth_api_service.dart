@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tripgenie/core/services/auth_service.dart';
 import 'package:tripgenie/core/services/local_backend_service.dart';
 
@@ -74,40 +75,34 @@ class AuthApiService {
         return user;
       }
 
-      // Email already taken in SQLite — fall back to local-only registration
-      final localUser = User(
-        id: 'local_${email.hashCode.abs()}',
-        name: name,
-        email: email,
-        token: 'local-token-$email',
-      );
-      await AuthService.saveLocalRegisteredUser(
-        name: name,
-        email: email,
-        password: password,
-      );
-      await AuthService.saveUser(localUser);
-      return localUser;
+      // Email already taken in SQLite — return null so the UI shows an error
+      return null;
     } catch (e) {
-      final localUser = User(
-        id: 'local_${email.hashCode.abs()}',
-        name: name,
-        email: email,
-        token: 'local-token-$email',
-      );
-      await AuthService.saveLocalRegisteredUser(
-        name: name,
-        email: email,
-        password: password,
-      );
-      await AuthService.saveUser(localUser);
-      return localUser;
+      // Only fall back for genuine errors (DB init failure, etc.),
+      // not for duplicate-email which is handled above.
+      return null;
     }
   }
 
   // Logout
   static Future<void> logout() async {
+    // Load user ID before clearing so we can clean up scoped keys
+    final user = await AuthService.loadUser();
     await AuthService.clearUser();
+
+    // Clean up user-scoped SharedPreferences keys
+    if (user != null) {
+      final prefs = await SharedPreferences.getInstance();
+      final keysToRemove = prefs.getKeys().where((k) =>
+          k.contains(user.id) ||
+          k.startsWith('joined_trip_${user.id}_') ||
+          k.startsWith('chat_last_read_${user.id}_') ||
+          k.startsWith('joined_chat_rooms${user.id}_') ||
+          k.startsWith('user_interests_${user.id}'));
+      for (final key in keysToRemove.toList()) {
+        await prefs.remove(key);
+      }
+    }
   }
 
   // Get current user

@@ -158,6 +158,7 @@ class _TripCard extends StatefulWidget {
 class _TripCardState extends State<_TripCard> {
   bool _hasJoined = false;
   bool _isJoining = false;
+  String _currentUserId = 'guest';
 
   @override
   void initState() {
@@ -166,8 +167,10 @@ class _TripCardState extends State<_TripCard> {
   }
 
   Future<void> _loadJoinState() async {
+    final user = await AuthService.loadUser();
+    _currentUserId = user?.id ?? 'guest';
     final prefs = await SharedPreferences.getInstance();
-    final joined = prefs.getBool('joined_trip_${widget.trip.id}') ?? false;
+    final joined = prefs.getBool('joined_trip_${_currentUserId}_${widget.trip.id}') ?? false;
     if (mounted) setState(() => _hasJoined = joined);
   }
 
@@ -184,11 +187,12 @@ class _TripCardState extends State<_TripCard> {
 
     // First time joining — save state then open chat
     setState(() => _isJoining = true);
+    final user = await AuthService.loadUser();
+    _currentUserId = user?.id ?? 'guest';
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('joined_trip_${widget.trip.id}', true);
+    await prefs.setBool('joined_trip_${_currentUserId}_${widget.trip.id}', true);
 
     // Increment member count in DB
-    final user = await AuthService.loadUser();
     if (user != null) {
       await LocalBackendService.joinTrip(widget.trip.id, user.id);
     }

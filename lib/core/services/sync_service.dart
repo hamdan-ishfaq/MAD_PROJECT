@@ -2,9 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:tripgenie/core/services/offline_db_service.dart';
 import 'package:tripgenie/core/services/dashboard_service.dart';
-import 'package:tripgenie/core/services/places_service.dart';
 import 'package:tripgenie/core/models/place_model.dart';
-import 'package:tripgenie/core/models/dashboard_model.dart';
 
 /// Manages background synchronization between the local SQLite cache and the backend.
 /// Runs periodically and when connectivity is restored.

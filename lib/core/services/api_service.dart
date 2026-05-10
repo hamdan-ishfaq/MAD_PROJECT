@@ -1,6 +1,5 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:tripgenie/core/services/local_backend_service.dart';
+import 'package:tripgenie/core/services/places_service.dart';
 import 'package:tripgenie/features/social/models/trip_model.dart';
 
 /// API service for external APIs and local backend operations.
@@ -9,6 +8,7 @@ import 'package:tripgenie/features/social/models/trip_model.dart';
 /// External API calls (places, weather) still use HTTP directly.
 class ApiService {
   // ─── Sample / Fallback places data ───
+  static List<Map<String, dynamic>> get fallbackPlaces => _fallbackPlaces;
 
   static const List<Map<String, dynamic>> _fallbackPlaces = [
     {'id': 'p1', 'name': 'Faisal Mosque', 'category': 'Culture', 'lat': 33.7295, 'lng': 73.0372, 'rating': 4.8, 'crowdLevel': 0.7, 'color': 0xFF6366F1},
@@ -33,7 +33,8 @@ class ApiService {
   // ─── Places (uses fallback data — no backend needed) ───
 
   static Future<List<dynamic>> getPlaces() async {
-    return _fallbackPlaces;
+    // Default to trending places near current location (mocking Islamabad center for discovery)
+    return await getNearbyPlaces(latitude: 33.6844, longitude: 73.0479);
   }
 
   /// Synchronous access to fallback places for ID-to-name resolution.
@@ -48,14 +49,29 @@ class ApiService {
     int radius = 8000,
     int limit = 150,
   }) async {
-    if (category != null && category.isNotEmpty && category != 'All') {
-      return _fallbackPlaces
-          .where((p) =>
-              (p['category'] as String).toLowerCase() ==
-              category.toLowerCase())
-          .toList();
-    }
-    return _fallbackPlaces;
+    // Call the real PlacesService which uses OpenTripMap
+    final places = await PlacesService.getNearbyPlaces(
+      latitude: latitude,
+      longitude: longitude,
+      category: category,
+      radius: radius,
+      limit: limit,
+    );
+    
+    // Convert Place objects back to Map for compatibility with existing UI
+    return places.map((p) => {
+      'id': p.id,
+      'name': p.name,
+      'category': p.category,
+      'lat': p.latitude,
+      'lng': p.longitude,
+      'rating': p.rating,
+      'crowdLevel': p.crowdLevel,
+      'color': p.category == 'Food' ? 0xFFF59E0B : 
+               p.category == 'Parks' ? 0xFF10B981 :
+               p.category == 'Culture' ? 0xFF6366F1 :
+               p.category == 'Shopping' ? 0xFFEC4899 : 0xFF8B5CF6,
+    }).toList();
   }
 
   // ─── Trips (now uses LocalBackendService) ───
@@ -75,13 +91,18 @@ class ApiService {
   // ─── Trending / Discovery (uses fallback data) ───
 
   static Future<List<dynamic>> getTrendingPlaces({int limit = 10}) async {
-    final sorted = List<Map<String, dynamic>>.from(_fallbackPlaces)
+    final places = await getPlaces();
+    final sorted = List<Map<String, dynamic>>.from(places)
       ..sort((a, b) =>
-          (b['rating'] as num).compareTo(a['rating'] as num));
+          ((b['rating'] as num?) ?? 0).compareTo((a['rating'] as num?) ?? 0));
     return sorted.take(limit).toList();
   }
 
   static Future<List<dynamic>> getTopVisitedPlaces({int limit = 10}) async {
-    return getTrendingPlaces(limit: limit);
+    final places = await getPlaces();
+    final sorted = List<Map<String, dynamic>>.from(places)
+      ..sort((a, b) =>
+          ((b['crowdLevel'] as num?) ?? 0).compareTo((a['crowdLevel'] as num?) ?? 0));
+    return sorted.take(limit).toList();
   }
 }

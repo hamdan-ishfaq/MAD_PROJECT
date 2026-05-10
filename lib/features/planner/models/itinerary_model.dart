@@ -24,11 +24,13 @@ class ActivityItem {
 class DayPlan {
   final int day;
   final String date;
+  final String weather;
   final List<ActivityItem> activities;
 
   DayPlan({
     required this.day,
     required this.date,
+    required this.weather,
     required this.activities,
   });
 
@@ -36,6 +38,7 @@ class DayPlan {
     return DayPlan(
       day:  json['day'],
       date: json['date'] ?? '',
+      weather: json['weather'] ?? 'Too soon to predict',
       activities: (json['activities'] as List<dynamic>)
           .map((a) => ActivityItem.fromJson(a as Map<String, dynamic>))
           .toList(),

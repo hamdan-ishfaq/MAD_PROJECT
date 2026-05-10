@@ -319,7 +319,7 @@ class _ChatScreenState extends State<ChatScreen> {
             Text(widget.trip.destination, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
             Text(
               '${widget.trip.startDate} – ${widget.trip.endDate} · ${widget.trip.currentMembers} members',
-              style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+              style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
           ],
         ),
@@ -350,7 +350,7 @@ class _ChatScreenState extends State<ChatScreen> {
               const PopupMenuItem(value: 'diary', child: ListTile(leading: Icon(Icons.book_outlined), title: Text('Trip Diary'), dense: true)),
               const PopupMenuItem(value: 'leave', child: ListTile(leading: Icon(Icons.logout, color: Colors.red), title: Text('Leave Room', style: TextStyle(color: Colors.red)), dense: true)),
             ],
-            icon: const Icon(Icons.more_vert, color: AppColors.textPrimary),
+            icon: Icon(Icons.more_vert, color: Theme.of(context).colorScheme.onSurface),
           ),
         ],
       ),
@@ -360,9 +360,9 @@ class _ChatScreenState extends State<ChatScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             color: theme.scaffoldBackgroundColor,
             child: Row(children: [
-              const Icon(Icons.info_outline_rounded, size: 14, color: AppColors.textSecondary),
+              Icon(Icons.info_outline_rounded, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
               const SizedBox(width: 6),
-              Expanded(child: Text(widget.trip.description, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary))),
+              Expanded(child: Text(widget.trip.description, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant))),
             ]),
           ),
           Divider(height: 1, color: theme.dividerColor),
@@ -509,41 +509,75 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _showDiaryDialog() async {
-    // In a real app, these notes would come from local DB. Mocking for MVP.
-    final mockNotes = [
-      "Arrived at the hotel, the view is amazing.",
-      "Ate some incredible local street food.",
-      "Visited the main square, it was very crowded but beautiful.",
-    ];
+    final controller = TextEditingController();
+    String? generatedStory;
+    bool isGenerating = false;
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Row(children: [
-          const Icon(Icons.book_outlined, color: AppColors.primary, size: 20),
-          const SizedBox(width: 10),
-          const Flexible(child: Text('AI Trip Story')),
-        ]),
-        content: FutureBuilder<String>(
-          future: AIService.summarizeDiary(widget.trip.destination, mockNotes),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const SizedBox(height: 100, child: Center(child: CircularProgressIndicator()));
-            }
-            return SingleChildScrollView(
-              child: Text(snapshot.data ?? 'Could not write story.', style: const TextStyle(fontSize: 13, height: 1.5, fontStyle: FontStyle.italic)),
-            );
-          },
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Story saved to Profile!')));
-            },
-            child: const Text('Save Story'),
-          ),
-        ],
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: Row(children: [
+              const Icon(Icons.book_outlined, color: AppColors.primary, size: 20),
+              const SizedBox(width: 10),
+              const Flexible(child: Text('AI Trip Story')),
+            ]),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (generatedStory == null) ...[
+                    const Text('What did you do on this trip?', style: TextStyle(fontSize: 13)),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: controller,
+                      maxLines: 4,
+                      decoration: InputDecoration(
+                        hintText: 'e.g. Visited the museum, ate local food...',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                    if (isGenerating) ...[
+                      const SizedBox(height: 16),
+                      const CircularProgressIndicator(),
+                    ]
+                  ] else ...[
+                    Text(generatedStory!, style: const TextStyle(fontSize: 13, height: 1.5, fontStyle: FontStyle.italic)),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+              if (generatedStory == null && !isGenerating)
+                ElevatedButton(
+                  onPressed: () async {
+                    if (controller.text.trim().isEmpty) return;
+                    setState(() => isGenerating = true);
+                    final story = await AIService.summarizeDiary(
+                        widget.trip.destination, [controller.text.trim()]);
+                    if (context.mounted) {
+                      setState(() {
+                        isGenerating = false;
+                        generatedStory = story ?? 'Could not write story.';
+                      });
+                    }
+                  },
+                  child: const Text('Generate'),
+                ),
+              if (generatedStory != null)
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Story saved to Profile!')));
+                  },
+                  child: const Text('Save Story'),
+                ),
+            ],
+          );
+        },
       ),
     );
   }

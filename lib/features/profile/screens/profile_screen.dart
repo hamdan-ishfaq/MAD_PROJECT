@@ -76,10 +76,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadUser() async {
     final user = await AuthService.loadUser();
-    // Count trips the user has joined via SharedPreferences
+    // Count trips the user has joined via SharedPreferences (user-scoped keys)
     final prefs = await SharedPreferences.getInstance();
+    final userId = user?.id ?? 'guest';
     final joinedCount = prefs.getKeys()
-        .where((k) => k.startsWith('joined_trip_') && prefs.getBool(k) == true)
+        .where((k) => k.startsWith('joined_trip_${userId}_') && prefs.getBool(k) == true)
         .length;
     if (user != null && mounted) {
       setState(() {

@@ -84,25 +84,25 @@ class SavedItineraryDetailScreen extends StatelessWidget {
             const SizedBox(height: 20),
             Text(
               'Created ${DateFormat('MMM d, y').format(itinerary.createdAt)}',
-              style: const TextStyle(
-                color: AppColors.textSecondary,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontSize: 12,
               ),
             ),
             const SizedBox(height: 20),
-            const Text(
+            Text(
               'Day Plans',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 12),
             if (days.isEmpty)
-              const Text(
+              Text(
                 'No day plans were saved with this itinerary.',
-                style: TextStyle(color: AppColors.textSecondary),
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
               )
             else
               ...days
@@ -112,21 +112,6 @@ class SavedItineraryDetailScreen extends StatelessWidget {
                         borderColor: borderColor,
                       ))
                   .toList(),
-            const SizedBox(height: 8),
-            const Text(
-              'Weather',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 12),
-            _SavedItineraryWeather(
-              destination: itinerary.destination,
-              surfaceColor: surfaceColor,
-              borderColor: borderColor,
-            ),
           ],
         ),
       ),
@@ -134,115 +119,7 @@ class SavedItineraryDetailScreen extends StatelessWidget {
   }
 }
 
-class _SavedItineraryWeather extends StatelessWidget {
-  final String destination;
-  final Color surfaceColor;
-  final Color borderColor;
 
-  const _SavedItineraryWeather({
-    required this.destination,
-    required this.surfaceColor,
-    required this.borderColor,
-  });
-
-  Future<String> _loadWeatherSummary() async {
-    final coordinates = await _resolveCoordinates(destination);
-    if (coordinates == null) {
-      return 'Weather unavailable for this destination.';
-    }
-
-    final uri = Uri.parse(
-      'https://api.open-meteo.com/v1/forecast?latitude=${coordinates['lat']}&longitude=${coordinates['lng']}&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto',
-    );
-    final response = await http.get(uri).timeout(const Duration(seconds: 10));
-    if (response.statusCode != 200) {
-      return 'Weather unavailable right now.';
-    }
-
-    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-    final daily = decoded['daily'] as Map<String, dynamic>?;
-    final maxTemp =
-        _firstNumber(daily?['temperature_2m_max'] as List<dynamic>?);
-    final minTemp =
-        _firstNumber(daily?['temperature_2m_min'] as List<dynamic>?);
-    final weatherCode = _firstNumber(daily?['weather_code'] as List<dynamic>?);
-
-    final description = switch (weatherCode?.toInt()) {
-      0 => 'Clear sky',
-      1 || 2 => 'Partly cloudy',
-      3 => 'Cloudy',
-      45 || 48 => 'Foggy',
-      51 || 53 || 55 => 'Drizzle',
-      61 || 63 || 65 => 'Rain',
-      71 || 73 || 75 => 'Snow',
-      80 || 81 || 82 => 'Showers',
-      95 || 96 || 99 => 'Thunderstorm',
-      _ => 'Forecast available',
-    };
-
-    final tempText = maxTemp != null && minTemp != null
-        ? '${maxTemp.toStringAsFixed(0)}° / ${minTemp.toStringAsFixed(0)}°'
-        : 'Temperature unavailable';
-
-    return '$description • $tempText';
-  }
-
-  Future<Map<String, double>?> _resolveCoordinates(String destination) async {
-    final uri = Uri.parse(
-      'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${Uri.encodeComponent(destination)}',
-    );
-    final response = await http.get(uri, headers: {
-      'User-Agent': 'wanderland-app'
-    }).timeout(const Duration(seconds: 10));
-
-    if (response.statusCode != 200) return null;
-
-    final decoded = jsonDecode(response.body);
-    if (decoded is! List || decoded.isEmpty) return null;
-
-    final first = decoded.first as Map<String, dynamic>;
-    final latitude = double.tryParse(first['lat']?.toString() ?? '');
-    final longitude = double.tryParse(first['lon']?.toString() ?? '');
-    if (latitude == null || longitude == null) return null;
-
-    return {'lat': latitude, 'lng': longitude};
-  }
-
-  num? _firstNumber(List<dynamic>? values) {
-    if (values == null || values.isEmpty) return null;
-    final value = values.first;
-    return value is num ? value : num.tryParse(value.toString());
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: surfaceColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor),
-      ),
-      child: FutureBuilder<String>(
-        future: _loadWeatherSummary(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          return Text(
-            snapshot.data ?? 'Weather unavailable right now.',
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              height: 1.4,
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
 
 class _MetaChip extends StatelessWidget {
   final String label;
@@ -303,13 +180,38 @@ class _DayPlanCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Day ${day['day'] ?? ''} - ${day['date'] ?? ''}',
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-            ),
+          Row(
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Day ${day['day'] ?? ''} - ${day['date'] ?? ''}',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                  if (day['weather'] != null) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.wb_sunny_outlined, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                        const SizedBox(width: 4),
+                        Text(
+                          day['weather'],
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           ...activities.map((activity) {
@@ -342,17 +244,17 @@ class _DayPlanCard extends StatelessWidget {
                       children: [
                         Text(
                           '${item['title'] ?? ''}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 14,
-                            color: AppColors.textPrimary,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           '${item['description'] ?? ''}',
-                          style: const TextStyle(
-                            color: AppColors.textSecondary,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
                             fontSize: 12,
                             height: 1.4,
                           ),

@@ -1,5 +1,4 @@
 import 'package:go_router/go_router.dart';
-import 'package:flutter/material.dart';
 import 'package:tripgenie/features/auth/screens/splash_screen.dart';
 import 'package:tripgenie/features/auth/screens/login_screen.dart';
 import 'package:tripgenie/features/home/screens/main_navigation.dart';

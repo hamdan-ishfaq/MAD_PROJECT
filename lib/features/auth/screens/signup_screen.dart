@@ -71,7 +71,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         backgroundColor: theme.scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
+          icon: Icon(Icons.arrow_back_rounded, color: Theme.of(context).colorScheme.onSurface),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -86,21 +86,21 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 const SizedBox(height: 8),
 
                 // Header
-                const Text(
+                Text(
                   'Create Account',
                   style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
+                    color: Theme.of(context).colorScheme.onSurface,
                     letterSpacing: -1,
                   ),
                 ),
                 const SizedBox(height: 6),
-                const Text(
+                Text(
                   'Join Wanderland and start exploring',
                   style: TextStyle(
                     fontSize: 14,
-                    color: AppColors.textSecondary,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     height: 1.5,
                   ),
                 ),
@@ -108,12 +108,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 const SizedBox(height: 32),
 
                 // Full Name
-                const Text(
+                Text(
                   'Full Name',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -134,12 +134,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 const SizedBox(height: 18),
 
                 // Email
-                const Text(
+                Text(
                   'Email Address',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -162,12 +162,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 const SizedBox(height: 18),
 
                 // Password
-                const Text(
+                Text(
                   'Password',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -199,12 +199,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 const SizedBox(height: 18),
 
                 // Confirm Password
-                const Text(
+                Text(
                   'Confirm Password',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 8),

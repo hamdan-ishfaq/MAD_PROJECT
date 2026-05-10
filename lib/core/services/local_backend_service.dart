@@ -665,16 +665,40 @@ class LocalBackendService {
       for (var i = 0; i < list.length; i++) {
         if (list[i]['id'] == updateId && list[i]['place_id'] == placeId) {
           final copy = Map<String, dynamic>.from(list[i]);
-          copy['likes'] = (copy['likes'] as int? ?? 0) + 1;
+          final wasLiked = (copy['user_liked'] as int? ?? 0) == 1;
+          if (wasLiked) {
+            copy['likes'] = ((copy['likes'] as int? ?? 1) - 1).clamp(0, 999999);
+            copy['user_liked'] = 0;
+          } else {
+            copy['likes'] = (copy['likes'] as int? ?? 0) + 1;
+            copy['user_liked'] = 1;
+          }
           list[i] = copy;
           break;
         }
       }
     } else {
-      await db!.rawUpdate(
-        'UPDATE community_updates SET likes = likes + 1 WHERE id = ? AND place_id = ?',
-        [updateId, placeId],
+      // Toggle: check current state, then flip
+      final rows = await db!.query(
+        'community_updates',
+        columns: ['user_liked', 'likes'],
+        where: 'id = ? AND place_id = ?',
+        whereArgs: [updateId, placeId],
       );
+      if (rows.isNotEmpty) {
+        final wasLiked = (rows.first['user_liked'] as int? ?? 0) == 1;
+        if (wasLiked) {
+          await db!.rawUpdate(
+            'UPDATE community_updates SET likes = MAX(likes - 1, 0), user_liked = 0 WHERE id = ? AND place_id = ?',
+            [updateId, placeId],
+          );
+        } else {
+          await db!.rawUpdate(
+            'UPDATE community_updates SET likes = likes + 1, user_liked = 1 WHERE id = ? AND place_id = ?',
+            [updateId, placeId],
+          );
+        }
+      }
     }
     return true;
   }
@@ -737,6 +761,14 @@ class LocalBackendService {
 
   static Future<List<String>> getFavorites(String userId) async {
     final db = await database;
+
+    if (kIsWeb) {
+      return _webStorage['favorites']!
+          .where((f) => f['user_id'] == userId)
+          .map((f) => f['place_id'] as String)
+          .toList();
+    }
+
     final rows = await db!.query(
       'favorites',
       where: 'user_id = ?',

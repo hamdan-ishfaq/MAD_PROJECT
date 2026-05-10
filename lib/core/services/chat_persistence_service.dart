@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tripgenie/features/social/models/trip_model.dart';
@@ -15,9 +16,11 @@ class ChatPersistenceService {
       final messagesJson = messages
           .map((m) => {
                 'id': m.id,
+                'senderId': m.senderId,
                 'senderName': m.senderName,
                 'senderInitials': m.senderInitials,
                 'text': m.text,
+                'messageType': m.messageType.name,
                 'timestamp': m.timestamp.toIso8601String(),
                 'isMe': m.isMe,
               })
@@ -25,7 +28,7 @@ class ChatPersistenceService {
       final jsonString = jsonEncode(messagesJson);
       return await prefs.setString('$_messagesKeyPrefix$tripId', jsonString);
     } catch (e) {
-      print('Error saving messages: $e');
+      debugPrint('Error saving messages: $e');
       return false;
     }
   }
@@ -44,15 +47,17 @@ class ChatPersistenceService {
       return jsonList
           .map((json) => ChatMessage(
                 id: json['id'] as String,
+                senderId: json['senderId'] as String? ?? '',
                 senderName: json['senderName'] as String,
                 senderInitials: json['senderInitials'] as String,
                 text: json['text'] as String,
+                messageType: ChatMessage.fromJson({'message_type': json['messageType']}).messageType,
                 timestamp: DateTime.parse(json['timestamp'] as String),
                 isMe: json['isMe'] as bool,
               ))
           .toList();
     } catch (e) {
-      print('Error loading messages: $e');
+      debugPrint('Error loading messages: $e');
       return <ChatMessage>[];
     }
   }
@@ -64,7 +69,7 @@ class ChatPersistenceService {
       messages.add(message);
       return await saveMessages(tripId, messages);
     } catch (e) {
-      print('Error adding message: $e');
+      debugPrint('Error adding message: $e');
       return false;
     }
   }
@@ -91,7 +96,7 @@ class ChatPersistenceService {
       final prefs = await SharedPreferences.getInstance();
       return await prefs.remove('$_messagesKeyPrefix$tripId');
     } catch (e) {
-      print('Error clearing messages: $e');
+      debugPrint('Error clearing messages: $e');
       return false;
     }
   }

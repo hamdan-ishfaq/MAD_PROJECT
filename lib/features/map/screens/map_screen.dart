@@ -455,7 +455,7 @@ class _MapScreenState extends State<MapScreen> {
                       height: 32,
                       child: Container(
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: Theme.of(context).colorScheme.surface,
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.blue, width: 2),
                           boxShadow: [
@@ -516,7 +516,7 @@ class _MapScreenState extends State<MapScreen> {
             bottom: 100,
             child: FloatingActionButton(
               heroTag: 'gps_btn',
-              backgroundColor: Colors.white,
+              backgroundColor: Theme.of(context).colorScheme.surface,
               onPressed: _getUserLocation,
               child: _isLoadingLocation
                   ? const SizedBox(
@@ -552,7 +552,7 @@ class _MapFilterBtn extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: isActive ? AppColors.primary : Colors.white,
+          color: isActive ? AppColors.primary : Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8)
@@ -562,12 +562,12 @@ class _MapFilterBtn extends StatelessWidget {
           children: [
             Icon(icon,
                 size: 20,
-                color: isActive ? Colors.white : AppColors.textPrimary),
+                color: isActive ? Colors.white : Theme.of(context).colorScheme.onSurface),
             Text(label,
                 style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
-                    color: isActive ? Colors.white : AppColors.textPrimary)),
+                    color: isActive ? Colors.white : Theme.of(context).colorScheme.onSurface)),
           ],
         ),
       ),

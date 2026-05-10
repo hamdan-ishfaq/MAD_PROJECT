@@ -122,12 +122,12 @@ class _DiscoveryHubScreenState extends State<DiscoveryHubScreen> {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  const Text(
+                  Text(
                     AppStrings.appName,
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
+                      color: theme.colorScheme.onSurface,
                       letterSpacing: -0.5,
                     ),
                   ),
@@ -135,8 +135,8 @@ class _DiscoveryHubScreenState extends State<DiscoveryHubScreen> {
               ),
               actions: [
                 IconButton(
-                  icon: const Icon(Icons.notifications_none_rounded,
-                      color: AppColors.textPrimary),
+                  icon: Icon(Icons.notifications_none_rounded,
+                      color: theme.colorScheme.onSurface),
               onPressed: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const NotificationsScreen()),
               ),
@@ -153,18 +153,18 @@ class _DiscoveryHubScreenState extends State<DiscoveryHubScreen> {
                   children: [
                     Text(
                       '${_getGreeting()} 👋',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
-                        color: AppColors.textSecondary,
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                     const SizedBox(height: 4),
-                    const Text(
+                    Text(
                       'Where are you\nexploring today?',
                       style: TextStyle(
                         fontSize: 26,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
+                        color: theme.colorScheme.onSurface,
                         height: 1.2,
                         letterSpacing: -0.5,
                       ),
@@ -180,9 +180,9 @@ class _DiscoveryHubScreenState extends State<DiscoveryHubScreen> {
                       child: Container(
                         height: 48,
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: theme.colorScheme.surface,
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.border),
+                          border: Border.all(color: theme.dividerColor),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withOpacity(0.03),
@@ -302,10 +302,10 @@ class _SectionHeader extends StatelessWidget {
       children: [
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.w800,
-            color: AppColors.textPrimary,
+            color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
         TextButton(
@@ -375,9 +375,9 @@ class _TrendingCard extends StatelessWidget {
           Container(
             width: 180,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: Theme.of(context).dividerColor),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.05),
@@ -411,10 +411,10 @@ class _TrendingCard extends StatelessWidget {
                     children: [
                       Text(
                         placeName,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -422,9 +422,9 @@ class _TrendingCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         place['category'] as String? ?? 'Category',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
-                          color: AppColors.textSecondary,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -466,10 +466,10 @@ class _TrendingCard extends StatelessWidget {
                           const SizedBox(width: 2),
                           Text(
                             '${place['rating'] ?? 4.0}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
+                              color: Theme.of(context).colorScheme.onSurface,
                             ),
                           ),
                         ],
@@ -504,7 +504,7 @@ class _TrendingCard extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.surface,
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
@@ -536,9 +536,9 @@ class _TopVisitedTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: Theme.of(context).dividerColor),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.04),
@@ -566,7 +566,7 @@ class _TopVisitedTile extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                   color: rank == 1
                       ? const Color(0xFFB45309)
-                      : AppColors.textSecondary,
+                      : Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
             ),
@@ -575,10 +575,10 @@ class _TopVisitedTile extends StatelessWidget {
           Expanded(
             child: Text(
               data['name'] as String,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
           ),
@@ -589,9 +589,9 @@ class _TopVisitedTile extends StatelessWidget {
               const SizedBox(width: 4),
               Text(
                 '${data['visits']} visits',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
-                  color: AppColors.textSecondary,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(width: 8),

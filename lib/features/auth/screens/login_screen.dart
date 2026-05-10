@@ -112,22 +112,22 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 24),
 
                 // App name
-                const Text(
+                Text(
                   AppStrings.appName,
                   style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
+                    color: Theme.of(context).colorScheme.onSurface,
                     letterSpacing: -1,
                   ),
                 ),
                 const SizedBox(height: 6),
-                const Text(
+                Text(
                   AppStrings.tagline,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 13,
-                    color: AppColors.textSecondary,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     height: 1.5,
                   ),
                 ),

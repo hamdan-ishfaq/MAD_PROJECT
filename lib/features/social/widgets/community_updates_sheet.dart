@@ -131,9 +131,9 @@ class _CommunityUpdatesSheetState extends State<CommunityUpdatesSheet> {
         return SafeArea(
           top: false,
           child: Container(
-            decoration: const BoxDecoration(
-              color: AppColors.background,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            decoration: BoxDecoration(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -239,7 +239,7 @@ class _CommunityUpdatesSheetState extends State<CommunityUpdatesSheet> {
                 ),
                 Container(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                  color: Colors.white,
+                  color: Theme.of(context).colorScheme.surface,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -267,6 +267,42 @@ class _CommunityUpdatesSheetState extends State<CommunityUpdatesSheet> {
                             selected: _selectedType == 'review',
                             onTap: () =>
                                 setState(() => _selectedType = 'review'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _textController,
+                              decoration: InputDecoration(
+                                hintText: 'Share a $_selectedType…',
+                                filled: true,
+                                fillColor: Theme.of(context).scaffoldBackgroundColor,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(color: AppColors.border),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(color: AppColors.border),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              ),
+                              maxLines: 1,
+                              textInputAction: TextInputAction.send,
+                              onSubmitted: (_) => _postUpdate(),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            onPressed: _postUpdate,
+                            icon: const Icon(Icons.send_rounded, color: AppColors.primary),
                           ),
                         ],
                       ),
@@ -320,7 +356,7 @@ class _CommunityUpdatesSheetState extends State<CommunityUpdatesSheet> {
               return Container(
                 height: 60,
                 width: double.infinity,
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.border)),
+                decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: Theme.of(context).dividerColor)),
                 child: const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))),
               );
             }
@@ -329,7 +365,7 @@ class _CommunityUpdatesSheetState extends State<CommunityUpdatesSheet> {
             return Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                gradient: LinearGradient(colors: [AppColors.primary.withValues(alpha: 0.05), Colors.white], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                gradient: LinearGradient(colors: [AppColors.primary.withValues(alpha: 0.05), Theme.of(context).colorScheme.surface], begin: Alignment.topLeft, end: Alignment.bottomRight),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
               ),
@@ -341,8 +377,7 @@ class _CommunityUpdatesSheetState extends State<CommunityUpdatesSheet> {
                     const SizedBox(width: 8),
                     const Text('AI Insights', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary, fontSize: 13)),
                   ]),
-                  const SizedBox(height: 8),
-                  Text(snapshot.data!, style: const TextStyle(fontSize: 12, height: 1.5, color: AppColors.textPrimary)),
+                  Text(snapshot.data!, style: TextStyle(fontSize: 12, height: 1.5, color: Theme.of(context).colorScheme.onSurface)),
                 ],
               ),
             );
@@ -354,9 +389,9 @@ class _CommunityUpdatesSheetState extends State<CommunityUpdatesSheet> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: Theme.of(context).dividerColor),
             ),
             child: Row(
               children: [
