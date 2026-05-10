@@ -66,16 +66,16 @@ class Place {
 
   // Get color based on crowd level
   Color get crowdColor {
-    if (crowdLevel < 30) return Colors.green;
-    if (crowdLevel < 60) return Colors.yellow;
-    if (crowdLevel < 80) return Colors.orange;
+    if (crowdLevel < 0.3) return Colors.green;
+    if (crowdLevel < 0.6) return Colors.yellow;
+    if (crowdLevel < 0.8) return Colors.orange;
     return Colors.red;
   }
 
   String get crowdStatus {
-    if (crowdLevel < 30) return 'Not Busy';
-    if (crowdLevel < 60) return 'Moderately Busy';
-    if (crowdLevel < 80) return 'Busy';
+    if (crowdLevel < 0.3) return 'Not Busy';
+    if (crowdLevel < 0.6) return 'Moderately Busy';
+    if (crowdLevel < 0.8) return 'Busy';
     return 'Very Busy';
   }
 }

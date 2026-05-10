@@ -197,23 +197,26 @@ class _CommunityUpdatesSheetState extends State<CommunityUpdatesSheet> {
 
                       if (updates.isEmpty) {
                         return Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.chat_bubble_outline,
-                                  size: 48, color: Colors.grey.shade300),
-                              const SizedBox(height: 12),
-                              const Text(
-                                'No updates yet',
-                                style:
-                                    TextStyle(color: AppColors.textSecondary),
-                              ),
-                              const Text(
-                                'Be the first to share a tip!',
-                                style: TextStyle(
-                                    fontSize: 12, color: AppColors.textHint),
-                              ),
-                            ],
+                          child: SingleChildScrollView(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.chat_bubble_outline,
+                                    size: 48, color: Colors.grey.shade300),
+                                const SizedBox(height: 12),
+                                const Text(
+                                  'No updates yet',
+                                  style:
+                                      TextStyle(color: AppColors.textSecondary),
+                                ),
+                                const Text(
+                                  'Be the first to share a tip!',
+                                  style: TextStyle(
+                                      fontSize: 12, color: AppColors.textHint),
+                                ),
+                              ],
+                            ),
                           ),
                         );
                       }
@@ -238,7 +241,7 @@ class _CommunityUpdatesSheetState extends State<CommunityUpdatesSheet> {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                  padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + MediaQuery.of(context).viewInsets.bottom),
                   color: Theme.of(context).colorScheme.surface,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
